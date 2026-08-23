@@ -576,12 +576,16 @@ function validateRecord(rec){
     if (f.required && (raw===undefined||raw===null||String(raw).trim()==='')) errors[f.key] = `${f.label} is required.`;
   });
   if (rec.mda && String(rec.mda).trim().length<2) errors.mda = 'MDA name looks too short.';
+  // Names and CSC File No are always stored in uppercase.
   if (rec.surname_first){
-    const parts = String(rec.surname_first).trim().split(/\s+/);
+    norm.surname_first = String(rec.surname_first).trim().toUpperCase();
+    const parts = norm.surname_first.split(/\s+/);
     if (parts.length<2) errors.surname_first = 'Enter surname and first name (surname first).';
-    else if (parts[0] !== parts[0].toUpperCase()) warnings.surname_first = 'Convention: SURNAME should be in capitals.';
   }
-  if (rec.csc_file_no && !/^[A-Za-z0-9\/\-]{3,20}$/.test(String(rec.csc_file_no).trim())) errors.csc_file_no = 'Use letters, numbers, "/" or "-" only (3–20 characters).';
+  if (rec.csc_file_no){
+    norm.csc_file_no = String(rec.csc_file_no).trim().toUpperCase();
+    if (!/^[A-Z0-9\/\-]{3,20}$/.test(norm.csc_file_no)) errors.csc_file_no = 'Use letters, numbers, "/" or "-" only (3–20 characters).';
+  }
   if (rec.oracle_no && !/^\d{4,10}$/.test(String(rec.oracle_no).trim())) errors.oracle_no = 'Oracle No must be numeric (4–10 digits).';
 
   const g1=normalizeGrade(rec.grade_1st), g2=normalizeGrade(rec.grade_present), g3=normalizeGrade(rec.grade_promotion);
@@ -628,7 +632,7 @@ function validateRecord(rec){
       if (requiredYears){
         const eligibleFrom = addYearsUTC(d3, requiredYears);
         if (eligibleFrom > target && !errors.date_present_appt){
-          errors.date_present_appt = `GL${g2} requires ${requiredYears} year(s) on the present grade — not eligible until ${fmtDate(eligibleFrom)} (after the ${fmtDate(target)} cycle date).`;
+          errors.date_present_appt = `Not eligible for the ${fmtDate(target)} cycle: GL${g2} requires ${requiredYears} year(s) on the present grade. With a Date of Present Appt of ${fmtDate(d3)}, this officer only becomes eligible on ${fmtDate(eligibleFrom)}.`;
         }
       }
     }
@@ -655,6 +659,8 @@ function validateRecord(rec){
    ========================================================================= */
 function showMsg(id,type,text){ const el=document.getElementById(id); el.className='msgbox show '+type; el.textContent=text; }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// Both 'admin' and the hidden 'superadmin' get administrator privileges in the UI.
+function isAdminRole(){ return !!CURRENT_USER && (CURRENT_USER.role==='admin' || CURRENT_USER.role==='superadmin'); }
 async function callScript(payload){
   if (!SCRIPT_URL) throw new Error('No Apps Script URL configured — the system administrator must complete first-time setup.');
   const res = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(payload) });
@@ -680,15 +686,16 @@ document.getElementById('tabbar').addEventListener('click', e=>{
    ========================================================================= */
 function updateAuthUI(){
   const loggedIn = !!CURRENT_USER;
+  const admin = isAdminRole();
   document.getElementById('tab-single').hidden = !loggedIn;
   document.getElementById('tab-bulk').hidden = !loggedIn;
-  document.getElementById('tab-admin').hidden = !(loggedIn && CURRENT_USER.role==='admin');
+  document.getElementById('tab-admin').hidden = !(loggedIn && admin);
   document.getElementById('tab-login').hidden = loggedIn;
 
   const hr = document.getElementById('header-right');
   if (loggedIn){
     hr.innerHTML = `<div class="user-chip">
-      <div class="who"><b>${escapeHtml(CURRENT_USER.name)}</b><span>${escapeHtml(CURRENT_USER.email)} · ${escapeHtml(CURRENT_USER.mda)} ${CURRENT_USER.role==='admin'?'· <b style=\"color:#E9D9B6\">ADMIN</b>':''}</span></div>
+      <div class="who"><b>${escapeHtml(CURRENT_USER.name)}</b><span>${escapeHtml(CURRENT_USER.email)} · ${escapeHtml(CURRENT_USER.mda)} ${admin?'· <b style=\"color:#E9D9B6\">ADMIN</b>':''}</span></div>
       <button class="btn-logout" id="logout-btn">Sign out</button>
     </div>`;
     document.getElementById('logout-btn').addEventListener('click', doLogout);
@@ -700,12 +707,12 @@ function updateAuthUI(){
   // Lock/unlock MDA field in Single Entry based on role
   const mdaInput = document.getElementById('f_mda');
   if (mdaInput){
-    if (loggedIn && CURRENT_USER.role!=='admin'){ mdaInput.value = CURRENT_USER.mda; mdaInput.disabled = true; }
+    if (loggedIn && !admin){ mdaInput.value = CURRENT_USER.mda; mdaInput.disabled = true; }
     else { mdaInput.disabled = false; }
   }
   const hint = document.getElementById('bulk-mda-hint');
   if (hint){
-    hint.textContent = (loggedIn && CURRENT_USER.role!=='admin')
+    hint.textContent = (loggedIn && !admin)
       ? `File must follow the Y2026 template column order. Every uploaded row will be recorded under your MDA (${CURRENT_USER.mda}), regardless of what the file's MDA column contains.`
       : `File must follow the Y2026 template column order.`;
   }
@@ -842,6 +849,15 @@ FIELDS.forEach(f=>{
   }
   input.name = f.key; input.id = 'f_'+f.key;
   if (f.mono) input.style.fontFamily = 'var(--mono)';
+  // Force uppercase as the user types for name and CSC file number.
+  if (f.key === 'surname_first' || f.key === 'csc_file_no'){
+    input.style.textTransform = 'uppercase';
+    input.addEventListener('input', ()=>{
+      const p = input.selectionStart;
+      input.value = input.value.toUpperCase();
+      try{ input.setSelectionRange(p, p); }catch(e){}
+    });
+  }
   wrap.appendChild(input);
   const em = document.createElement('div'); em.className='err-msg'; wrap.appendChild(em);
   singleFieldsEl.appendChild(wrap);
@@ -943,13 +959,13 @@ document.getElementById('single-form').addEventListener('submit', e=>{
   renderQueue();
   document.getElementById('single-form').reset();
   resetCadrePickers();
-  if (CURRENT_USER && CURRENT_USER.role!=='admin') document.getElementById('f_mda').value = CURRENT_USER.mda;
+  if (CURRENT_USER && !isAdminRole()) document.getElementById('f_mda').value = CURRENT_USER.mda;
   showMsg('single-msg', warnKeys.length?'warn':'ok', warnKeys.length ? `Added to queue with ${warnKeys.length} soft warning(s): ${Object.values(warnings).join(' ')}` : 'Record validated and added to the queue.');
 });
 document.getElementById('single-clear').addEventListener('click',()=>{
   document.getElementById('single-form').reset();
   resetCadrePickers();
-  if (CURRENT_USER && CURRENT_USER.role!=='admin') document.getElementById('f_mda').value = CURRENT_USER.mda;
+  if (CURRENT_USER && !isAdminRole()) document.getElementById('f_mda').value = CURRENT_USER.mda;
   document.querySelectorAll('#single-fields .field').forEach(w=>{w.classList.remove('invalid'); const em=w.querySelector('.err-msg'); if(em) em.textContent='';});
   document.getElementById('single-msg').className='msgbox';
 });
@@ -998,7 +1014,7 @@ document.getElementById('bulk-file').addEventListener('change', async (e)=>{
     const rec = { _rowNum: i+2 };
     FIELDS.forEach(f=>{ rec[f.key]=''; });
     Object.entries(row).forEach(([k,v])=>{ const fk=keyMap[k]; if(fk) rec[fk] = (v instanceof Date)?v:String(v).trim(); });
-    if (CURRENT_USER && CURRENT_USER.role!=='admin') rec.mda = CURRENT_USER.mda; // MDA locked to account
+    if (CURRENT_USER && !isAdminRole()) rec.mda = CURRENT_USER.mda; // MDA locked to account
     return rec;
   });
   document.getElementById('bulk-review-card').style.display='block';
@@ -1029,7 +1045,7 @@ function renderBulkTable(){
     const hasErr = Object.keys(r._errors||{}).length>0;
     const cells = FIELDS.map(f=>{
       const isErr = r._errors && r._errors[f.key];
-      const locked = f.key==='mda' && CURRENT_USER && CURRENT_USER.role!=='admin';
+      const locked = f.key==='mda' && CURRENT_USER && !isAdminRole();
       const editable = locked ? 'false' : 'true';
       const title = isErr ? ` title="${escapeHtml(r._errors[f.key])}"` : '';
       return `<td contenteditable="${editable}" data-ri="${ri}" data-key="${f.key}" class="${isErr?'cell-err':'cell-ok'}"${title}>${escapeHtml(r[f.key]||'')}</td>`;
@@ -1102,7 +1118,9 @@ async function loadUsers(){
     const table = document.getElementById('users-table');
     table.querySelector('thead')?.remove();
     table.innerHTML = `<thead><tr><th>Name</th><th>Email</th><th>MDA</th><th>Role</th><th>Created</th><th></th></tr></thead><tbody></tbody>`;
-    table.querySelector('tbody').innerHTML = res.users.map(u=>`
+    // Defense-in-depth: also drop any superadmin client-side (backend already filters).
+    const visibleUsers = (res.users||[]).filter(u=>u.role!=='superadmin');
+    table.querySelector('tbody').innerHTML = visibleUsers.map(u=>`
       <tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.mda)}</td>
       <td><span class="pill ${u.role==='admin'?'admin':'ok'}">${u.role}</span></td>
       <td>${escapeHtml(String(u.createdAt).slice(0,10))}</td>
@@ -1123,7 +1141,7 @@ async function deleteUser(email){
    ========================================================================= */
 let adminData = [];
 async function loadAdminData(){
-  if (!CURRENT_USER || CURRENT_USER.role!=='admin') return;
+  if (!CURRENT_USER || !isAdminRole()) return;
   try{
     const res = await callScript({action:'getAllRecords', token:AUTH_TOKEN});
     if (res.success){ adminData = res.records||[]; populateMdaFilter(); renderAdminTable(); renderKpis(); }
@@ -1160,7 +1178,14 @@ function renderAdminTable(){
 }
 function editRecordRow(id){
   const tr = document.querySelector(`#admin-table tr[data-id="${id}"]`); if (!tr) return;
-  tr.querySelectorAll('td[data-key]').forEach(td=>{ td.contentEditable='true'; td.classList.add('cell-err'); td.style.background='#FFFCF0'; });
+  tr.querySelectorAll('td[data-key]').forEach(td=>{
+    td.contentEditable='true'; td.classList.add('cell-err'); td.style.background='#FFFCF0';
+    // Live uppercase for name and CSC file number cells.
+    if (td.dataset.key === 'surname_first' || td.dataset.key === 'csc_file_no'){
+      td.style.textTransform = 'uppercase';
+      td.addEventListener('input', ()=>{ /* visual via textTransform; value uppercased on save */ });
+    }
+  });
   const actionCell = tr.querySelector('.action-btns');
   actionCell.innerHTML = `<button class="btn btn-gold" onclick="saveRecordRow('${id}')">Save</button><button class="btn btn-ghost" onclick="renderAdminTable()">Cancel</button>`;
 }
@@ -1168,14 +1193,17 @@ async function saveRecordRow(id){
   const tr = document.querySelector(`#admin-table tr[data-id="${id}"]`); if (!tr) return;
   const fields = {};
   tr.querySelectorAll('td[data-key]').forEach(td=>{ fields[td.dataset.key] = td.textContent.trim(); });
-  const {errors} = validateRecord(fields);
+  const {errors, normalized} = validateRecord(fields);
   const errKeys = Object.keys(errors);
   if (errKeys.length){
     const msg = errKeys.map(k=>{ const f=FIELDS.find(x=>x.key===k); return `• ${f?f.label:k}: ${errors[k]}`; }).join('\n');
     if (!confirm(`This edit fails ${errKeys.length} validation rule(s):\n\n${msg}\n\nSave anyway as super administrator?`)) return;
   }
+  // Persist normalized values (uppercased name/CSC file no, formatted dates, etc.)
+  const outFields = {};
+  Object.keys(fields).forEach(k=>{ outFields[k] = (normalized[k] !== undefined) ? normalized[k] : fields[k]; });
   try{
-    const res = await callScript({action:'adminUpdateRecord', token:AUTH_TOKEN, id, fields});
+    const res = await callScript({action:'adminUpdateRecord', token:AUTH_TOKEN, id, fields: outFields});
     if (res.success) loadAdminData(); else alert(res.message || 'Could not save changes.');
   }catch(err){ alert('Could not save changes: '+err.message); }
 }
