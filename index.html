@@ -1904,7 +1904,32 @@ document.getElementById('bulk-submit').addEventListener('click', async ()=>{
 });
 document.getElementById('bulk-template-link').addEventListener('click', (e)=>{
   e.preventDefault();
-  const ws = XLSX.utils.aoa_to_sheet([FIELDS.map(f=>f.col)]);
+  // A worked sample row so uploaders see the exact expected format for every column.
+  const SAMPLE = {
+    'MDA':'Lagos State Public Procurement Agency (PPA)',
+    'Names (Surname First)':'ADELANI OLUWAMIDARE',
+    'CSC File No':'P-49242',
+    'Oracle No':'234576',
+    'Post of 1st Appt':'Fisheries Officer II',
+    'Grade Level (1st Appt)':'08',
+    'Date of 1st Appt':'30-Aug-2021',
+    'Date of Confirmation':'30-Aug-2022',
+    'Present Post/Cadre':'Fisheries Officer I',
+    'Grade Level (Present)':'09',
+    'Date of Present Appt':'30-Aug-2023',
+    'Promotion Post/Cadre':'Senior Fisheries Officer',
+    'Grade Level (Promotion)':'10',
+    'Proposed Notional Date':'01-Jul-2027',
+    'Proposed Financial Date':'01-Jul-2027',
+    'Official Email':'officer1@lagosstate.gov.ng',
+    'Mobile No':'08031234567',
+    'Disability':'NONE',
+    'Remarks':'Sample row — replace or delete before uploading'
+  };
+  const headers = FIELDS.map(f=>f.col);
+  const sampleRow = FIELDS.map(f=>SAMPLE[f.col]!==undefined?SAMPLE[f.col]:'');
+  const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+  ws['!cols'] = headers.map(h=>({wch: Math.max(14, Math.min(28, h.length+3))}));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Eligibility List');
   // Second sheet: full cadre/post/grade reference, so bulk uploaders can copy exact titles.
