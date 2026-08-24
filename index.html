@@ -44,6 +44,23 @@
   .wrap{max-width:1180px;margin:0 auto;padding:26px 28px 10px;}
   .panel{display:none;}
   .panel.active{display:block;animation:fade .18s ease;}
+  /* Sign-in + Brief-on-Candidate two-column layout */
+  .login-layout{display:flex;gap:26px;align-items:stretch;flex-wrap:wrap;}
+  .login-layout > .card.narrow{flex:1 1 380px;max-width:440px;margin-bottom:0;}
+  .brief-cta{flex:1 1 380px;display:flex;}
+  .brief-box{flex:1;border:3px solid var(--navy);border-radius:8px;background:#fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:30px 26px;cursor:pointer;transition:box-shadow .15s ease,transform .1s ease;}
+  .brief-box:hover{box-shadow:0 6px 20px rgba(15,44,76,.18);transform:translateY(-1px);}
+  .brief-box:active{transform:translateY(0);}
+  .brief-box .org{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:15px;line-height:1.5;letter-spacing:.5px;}
+  .brief-box .headline{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:19px;margin:14px 0 4px;}
+  .brief-box .sub{color:var(--ink);font-size:13px;line-height:1.5;margin-top:10px;}
+  .brief-box .click{margin-top:16px;display:inline-block;background:var(--gold);color:#fff;font-family:var(--sans);
+    font-weight:700;letter-spacing:.5px;font-size:13px;padding:9px 20px;border-radius:5px;text-transform:uppercase;}
+  .brief-box:hover .click{background:var(--gold-dark,#96701f);}
+  .brief-sec{font-family:var(--sans);font-weight:700;color:var(--navy);font-size:14px;
+    border-left:3px solid var(--gold);padding-left:9px;margin:20px 0 10px;text-transform:uppercase;letter-spacing:.5px;}
   @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
 
   .card{background:#fff;border:1px solid var(--paper-line);border-radius:6px;padding:20px 22px;margin-bottom:18px;box-shadow:0 1px 2px rgba(15,44,76,.04);}
@@ -158,18 +175,105 @@
 
   <!-- =================== LOGIN =================== -->
   <section class="panel" id="panel-login">
-    <div class="card narrow">
-      <h2><span class="idx">🔐</span>Sign In</h2>
-      <p class="hint">Accounts are created by the super administrator. If you don't have one yet, ask your admin. Already have an account but forgot your password? Use the link below.</p>
-      <div id="login-msg" class="msgbox"></div>
-      <div class="field"><label class="req">Email</label><input type="text" id="login-email" autocomplete="username"></div>
-      <div class="field"><label class="req">Password</label><input type="password" id="login-password" autocomplete="current-password"></div>
-      <div class="btnbar"><button class="btn btn-primary" id="login-btn">Sign In</button></div>
-      <p style="margin-top:14px;"><button class="linklike" id="goto-forgot">Forgot your password?</button></p>
+    <div class="login-layout">
+      <div class="card narrow">
+        <h2><span class="idx">🔐</span>Sign In</h2>
+        <p class="hint">Accounts are created by the super administrator. If you don't have one yet, ask your admin. Already have an account but forgot your password? Use the link below.</p>
+        <div id="login-msg" class="msgbox"></div>
+        <div class="field"><label class="req">Email</label><input type="text" id="login-email" autocomplete="username"></div>
+        <div class="field"><label class="req">Password</label><input type="password" id="login-password" autocomplete="current-password"></div>
+        <div class="btnbar"><button class="btn btn-primary" id="login-btn">Sign In</button></div>
+        <p style="margin-top:14px;"><button class="linklike" id="goto-forgot">Forgot your password?</button></p>
+      </div>
+      <div class="brief-cta">
+        <div class="brief-box" id="brief-open" role="button" tabindex="0" aria-label="Open Brief on Candidate Form A">
+          <div class="org">LAGOS STATE GOVERNMENT<br>CIVIL SERVICE COMMISSION<br>YEAR 2027 PROMOTION EXERCISE</div>
+          <div class="headline">BRIEF ON CANDIDATE</div>
+          <div class="sub">TO BE COMPLETED BY THE<br>ELIGIBLE OFFICER</div>
+          <span class="click">Click Here</span>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- =================== FORGOT PASSWORD =================== -->
+  <!-- =================== FORM A — BRIEF ON CANDIDATE =================== -->
+  <section class="panel" id="panel-brief">
+    <div class="card" style="max-width:900px;margin:0 auto;">
+      <div style="text-align:center;border-bottom:2px solid var(--gold);padding-bottom:14px;margin-bottom:6px;">
+        <div style="font-family:var(--serif);font-weight:700;color:var(--navy);font-size:16px;line-height:1.5;">
+          LAGOS STATE GOVERNMENT · CIVIL SERVICE COMMISSION<br>YEAR 2027 PROMOTION EXERCISE
+        </div>
+        <div style="font-family:var(--serif);font-weight:700;color:var(--navy);font-size:20px;margin-top:8px;">BRIEF ON CANDIDATE — FORM A</div>
+        <div class="hint" style="margin-top:6px;">To be completed by the eligible officer. <b>All fields are required.</b></div>
+      </div>
+      <div id="brief-msg" class="msgbox"></div>
+
+      <h3 class="brief-sec">1. Candidate</h3>
+      <div class="grid">
+        <div class="field"><label class="req">Name (Surname first)</label><input type="text" id="b_name" style="text-transform:uppercase" placeholder="SURNAME FIRSTNAME"></div>
+        <div class="field"><label class="req">Department/Ministry (MDA)</label><select id="b_mda"></select></div>
+      </div>
+
+      <h3 class="brief-sec">2–4. Appointment Dates &amp; Designations</h3>
+      <div class="grid">
+        <div class="field"><label class="req">Date of 1st Appt</label><input type="date" id="b_date_1st"></div>
+        <div class="field"><label class="req">Designation at 1st Appt</label><select id="b_desig_1st"></select></div>
+        <div class="field"><label class="req">Date of Confirmation</label><input type="date" id="b_date_conf"></div>
+        <div class="field"><label class="req">Date of Present Appt</label><input type="date" id="b_date_present"></div>
+        <div class="field"><label class="req">Present Designation</label><select id="b_desig_present"></select></div>
+        <div class="field"><label class="req">Conversion Post</label><select id="b_conversion_post"></select></div>
+      </div>
+
+      <h3 class="brief-sec">7. Educational Qualifications (with dates)</h3>
+      <div class="grid">
+        <div class="field"><label class="req">(a) Post Primary</label><input type="text" id="b_edu_postprimary" placeholder="e.g. Modern School, 1998"></div>
+        <div class="field"><label class="req">(b) Secondary School</label><input type="text" id="b_edu_secondary" placeholder="e.g. WASSCE, 2001"></div>
+        <div class="field"><label class="req">(c) University etc</label><input type="text" id="b_edu_university" placeholder="e.g. B.Sc, 2007"></div>
+        <div class="field"><label class="req">(d) Professional Certificates</label><input type="text" id="b_edu_professional" placeholder="e.g. ICAN, 2010"></div>
+        <div class="field"><label class="req">(e) Additional Qualification</label><input type="text" id="b_edu_additional" placeholder="e.g. M.Sc, 2015"></div>
+      </div>
+
+      <h3 class="brief-sec">8. Personal Details</h3>
+      <div class="grid">
+        <div class="field"><label class="req">(a) Date of Birth</label><input type="date" id="b_dob"></div>
+        <div class="field"><label class="req">(b) State of Origin</label><select id="b_state_origin"></select></div>
+        <div class="field"><label class="req">(c) Nationality</label><input type="text" id="b_nationality" value="Nigerian"></div>
+        <div class="field"><label class="req">(d) Age</label><input type="number" id="b_age" min="16" max="70" placeholder="auto from DOB" readonly></div>
+        <div class="field"><label class="req">(e) CSC File No.</label><input type="text" id="b_csc_file" style="text-transform:uppercase;font-family:var(--mono)"></div>
+        <div class="field"><label class="req">(f) Oracle No.</label><input type="text" id="b_oracle" style="font-family:var(--mono)"></div>
+      </div>
+
+      <h3 class="brief-sec">9–11. Service Record</h3>
+      <div class="grid">
+        <div class="field"><label class="req">9. Date issued last query, if any?</label><input type="text" id="b_last_query" placeholder="Date or 'None'"></div>
+        <div class="field"><label class="req">10. Is officer facing disciplinary action?</label>
+          <select id="b_disciplinary"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+        <div class="field" style="grid-column:1 / -1;"><label class="req">11. Pending request/appeal with Commission / Recent appraisal</label><input type="text" id="b_pending" placeholder="Details or 'None'"></div>
+      </div>
+
+      <h3 class="brief-sec">12. Performance Appraisal — Last 3 Years</h3>
+      <div class="grid">
+        <div class="field"><label class="req" id="b_yr1_lab">Year 1</label><input type="number" step="0.01" id="b_score1" placeholder="Score"></div>
+        <div class="field"><label class="req" id="b_yr2_lab">Year 2</label><input type="number" step="0.01" id="b_score2" placeholder="Score"></div>
+        <div class="field"><label class="req" id="b_yr3_lab">Year 3</label><input type="number" step="0.01" id="b_score3" placeholder="Score"></div>
+      </div>
+
+      <h3 class="brief-sec">13. Certification — Director, Admin. &amp; Human Resource</h3>
+      <p class="hint">D(A&amp;HR) is to endorse and stamp ONLY after verifying correctness and completeness of the officer's information.</p>
+      <div class="grid">
+        <div class="field"><label class="req">Name</label><input type="text" id="b_cert_name"></div>
+        <div class="field"><label class="req">Rank</label><input type="text" id="b_cert_rank"></div>
+        <div class="field"><label class="req">Telephone</label><input type="tel" id="b_cert_phone" placeholder="0803xxxxxxx"></div>
+        <div class="field"><label class="req">Date</label><input type="date" id="b_cert_date"></div>
+      </div>
+      <p class="hint" style="margin-top:6px;">Signature/stamp is applied on the printed copy after download.</p>
+
+      <div class="btnbar" style="margin-top:18px;">
+        <button class="btn btn-primary" id="brief-submit-btn">Save &amp; Download Form A</button>
+        <button class="btn btn-ghost" id="brief-back-btn">Back to Sign In</button>
+      </div>
+    </div>
+  </section>
   <section class="panel" id="panel-forgot">
     <div class="card narrow">
       <h2><span class="idx">✉</span>Reset Your Password</h2>
@@ -352,7 +456,7 @@
 /* =========================================================================
    CONFIG
    ========================================================================= */
-const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKTcVbT3zHq4TeCmRHWjl9aPn6xxqH5SNrfXEjvt7Yw9yAAbitMpBqR5p0UWSemitk/exec"; // hardcode your deployed Apps Script Web App URL here for a permanent build
+const DEFAULT_SCRIPT_URL = ""; // hardcode your deployed Apps Script Web App URL here for a permanent build
 // Resolve the backend URL: prefer the hardcoded one, else a URL saved by a
 // previous one-time setup on this browser.
 let SAVED_SCRIPT_URL = "";
@@ -493,6 +597,19 @@ function ensureMDAOption(sel, value){
     og.appendChild(op); sel.appendChild(og);
   }
 }
+// Build <optgroup> markup of all posts (designations), grouped by cadre, for Form A pickers.
+function postOptionsHTML(){
+  let html = '<option value="">Select designation…</option>';
+  CADRE_GROUPS.forEach(g=>{
+    html += `<optgroup label="${escapeHtml(g.name)}">`;
+    g.posts.forEach(p=>{ html += `<option value="${escapeHtml(p.title)}">${escapeHtml(p.title)} (GL${p.gl})</option>`; });
+    html += '</optgroup>';
+  });
+  return html;
+}
+// 36 states + FCT for State of Origin.
+const NIGERIA_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara','FCT — Abuja'];
+function stateOptionsHTML(){ return '<option value="">Select state…</option>' + NIGERIA_STATES.map(s=>`<option value="${s}">${s}</option>`).join(''); }
 // Build <optgroup> markup for a grouped MDA <select>. `selected` pre-selects a value.
 function mdaOptionsHTML(selected){
   let html = '<option value="">Select MDA…</option>';
@@ -892,6 +1009,168 @@ document.getElementById('goto-forgot').addEventListener('click', ()=>showPanel('
 document.getElementById('goto-login-from-forgot').addEventListener('click', ()=>showPanel('login'));
 document.getElementById('goto-login-from-reset').addEventListener('click', ()=>showPanel('login'));
 document.getElementById('goto-reset-code').addEventListener('click', ()=>showPanel('reset'));
+
+/* =========================================================================
+   FORM A — BRIEF ON CANDIDATE (eligible officer, no login)
+   ========================================================================= */
+(function initBriefForm(){
+  // Populate the pickers once.
+  const mda = document.getElementById('b_mda'); if (mda) mda.innerHTML = mdaOptionsHTML('');
+  ['b_desig_1st','b_desig_present','b_conversion_post'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.innerHTML = postOptionsHTML();
+  });
+  const st = document.getElementById('b_state_origin'); if (st) st.innerHTML = stateOptionsHTML();
+  // Appraisal year labels = the three years before the Y2027 cycle (2024, 2025, 2026).
+  const yrs = [2024,2025,2026];
+  ['b_yr1_lab','b_yr2_lab','b_yr3_lab'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.textContent = yrs[i]+' Score'; });
+
+  // Auto-calculate Age from Date of Birth.
+  const dob = document.getElementById('b_dob'), ageEl = document.getElementById('b_age');
+  if (dob && ageEl){
+    dob.addEventListener('change', ()=>{
+      if (!dob.value){ ageEl.value=''; return; }
+      const d = new Date(dob.value); const now = new Date();
+      let age = now.getFullYear() - d.getFullYear();
+      const m = now.getMonth() - d.getMonth();
+      if (m<0 || (m===0 && now.getDate()<d.getDate())) age--;
+      ageEl.value = (age>=0 && age<130) ? age : '';
+    });
+  }
+  // Uppercase name and CSC file no as typed.
+  ['b_name','b_csc_file'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', ()=>{ const p=el.selectionStart; el.value=el.value.toUpperCase(); try{el.setSelectionRange(p,p);}catch(e){} });
+  });
+})();
+
+// Open / close Form A.
+function openBriefForm(){ showPanel('brief'); window.scrollTo(0,0); }
+document.getElementById('brief-open').addEventListener('click', openBriefForm);
+document.getElementById('brief-open').addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openBriefForm(); } });
+document.getElementById('brief-back-btn').addEventListener('click', ()=>showPanel('login'));
+
+// Collect all Form A fields with labels for validation + output.
+function collectBriefForm(){
+  const F = id => (document.getElementById(id)||{}).value || '';
+  return {
+    'Name (Surname first)': F('b_name').trim().toUpperCase(),
+    'Department/Ministry': F('b_mda'),
+    'Date of 1st Appt': F('b_date_1st'),
+    'Designation at 1st Appt': F('b_desig_1st'),
+    'Date of Confirmation': F('b_date_conf'),
+    'Date of Present Appt': F('b_date_present'),
+    'Present Designation': F('b_desig_present'),
+    'Conversion Post': F('b_conversion_post'),
+    'Educ: Post Primary': F('b_edu_postprimary').trim(),
+    'Educ: Secondary School': F('b_edu_secondary').trim(),
+    'Educ: University etc': F('b_edu_university').trim(),
+    'Educ: Professional Certificates': F('b_edu_professional').trim(),
+    'Educ: Additional Qualification': F('b_edu_additional').trim(),
+    'Date of Birth': F('b_dob'),
+    'State of Origin': F('b_state_origin'),
+    'Nationality': F('b_nationality').trim(),
+    'Age': F('b_age'),
+    'CSC File No.': F('b_csc_file').trim().toUpperCase(),
+    'Oracle No.': F('b_oracle').trim(),
+    'Date issued last query': F('b_last_query').trim(),
+    'Facing disciplinary action?': F('b_disciplinary'),
+    'Pending request/appeal/appraisal': F('b_pending').trim(),
+    'Appraisal 2024 Score': F('b_score1'),
+    'Appraisal 2025 Score': F('b_score2'),
+    'Appraisal 2026 Score': F('b_score3'),
+    'Certifying Officer Name': F('b_cert_name').trim(),
+    'Certifying Officer Rank': F('b_cert_rank').trim(),
+    'Certifying Officer Telephone': F('b_cert_phone').trim(),
+    'Certification Date': F('b_cert_date'),
+  };
+}
+
+document.getElementById('brief-submit-btn').addEventListener('click', async ()=>{
+  const data = collectBriefForm();
+  // Every field is compulsory.
+  const missing = Object.keys(data).filter(k=>!String(data[k]).trim());
+  if (missing.length){
+    showMsg('brief-msg','err', `All fields are required. Please complete: ${missing.slice(0,6).join(', ')}${missing.length>6?` and ${missing.length-6} more`:''}.`);
+    document.getElementById('panel-brief').scrollIntoView({block:'start'});
+    return;
+  }
+  // Light sanity checks.
+  if (!/^\d{4,10}$/.test(data['Oracle No.'])){ showMsg('brief-msg','err','Oracle No. must be 4–10 digits.'); return; }
+  if (!/^0\d{10}$/.test(data['Certifying Officer Telephone'].replace(/^(\+?234)/,'0'))){ showMsg('brief-msg','err','Certifying officer telephone must be an 11-digit Nigerian number.'); return; }
+
+  const btn = document.getElementById('brief-submit-btn'); const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  showMsg('brief-msg','warn','Saving your Brief on Candidate…');
+
+  // 1) Save to the Google Sheet (best-effort). 2) Always download a copy.
+  let saved = false, saveMsg = '';
+  try{
+    const res = await callScript({action:'submitBrief', brief:data});
+    if (res && res.success){ saved = true; }
+    else { saveMsg = (res && res.message) ? res.message : 'Save was not confirmed by the server.'; }
+  }catch(err){ saveMsg = err.message; }
+
+  downloadBriefDoc(data);
+
+  btn.disabled = false; btn.textContent = orig;
+  if (saved){
+    showMsg('brief-msg','ok','Your Brief on Candidate was saved and a copy has been downloaded. You may print, sign/stamp (item 13), and submit it.');
+  } else {
+    showMsg('brief-msg','warn',`A copy was downloaded to your device. Online save was not confirmed (${saveMsg||'no connection'}), so please ensure the downloaded copy reaches the Commission.`);
+  }
+});
+
+// Build a self-contained, printable HTML document of Form A and trigger download.
+function downloadBriefDoc(d){
+  const row = (label,val)=>`<tr><td class="l">${escapeHtml(label)}</td><td class="v">${escapeHtml(val)}</td></tr>`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Form A — Brief on Candidate</title>
+  <style>
+    body{font-family:Georgia,serif;color:#1B2430;max-width:800px;margin:24px auto;padding:0 24px;}
+    .hd{text-align:center;border-bottom:2px solid #B9892E;padding-bottom:10px;margin-bottom:16px;}
+    .hd .o{font-weight:700;color:#0F2C4C;font-size:15px;line-height:1.5;}
+    .hd .t{font-weight:700;color:#0F2C4C;font-size:19px;margin-top:6px;}
+    h3{color:#0F2C4C;border-left:3px solid #B9892E;padding-left:8px;font-size:14px;margin:18px 0 6px;text-transform:uppercase;}
+    table{width:100%;border-collapse:collapse;margin-bottom:6px;}
+    td{border:1px solid #C9CFD8;padding:6px 9px;font-size:13px;vertical-align:top;}
+    td.l{width:42%;background:#F6F5F1;font-weight:600;}
+    .cert{margin-top:18px;border:1px solid #C9CFD8;padding:12px;}
+    .sig{margin-top:26px;display:flex;justify-content:space-between;font-size:13px;}
+    .note{font-size:11px;color:#5B6572;margin-top:10px;}
+    @media print{body{margin:0;}}
+  </style></head><body>
+  <div class="hd"><div class="o">LAGOS STATE GOVERNMENT · CIVIL SERVICE COMMISSION<br>YEAR 2027 PROMOTION EXERCISE</div>
+  <div class="t">BRIEF ON CANDIDATE — FORM A</div></div>
+  <h3>1. Candidate</h3><table>${row('Name (Surname first)',d['Name (Surname first)'])}${row('Department/Ministry',d['Department/Ministry'])}</table>
+  <h3>2–6. Appointments &amp; Designations</h3><table>
+  ${row('Date of 1st Appt',d['Date of 1st Appt'])}${row('Designation at 1st Appt',d['Designation at 1st Appt'])}
+  ${row('Date of Confirmation',d['Date of Confirmation'])}${row('Date of Present Appt',d['Date of Present Appt'])}
+  ${row('Present Designation',d['Present Designation'])}${row('Conversion Post',d['Conversion Post'])}</table>
+  <h3>7. Educational Qualifications</h3><table>
+  ${row('(a) Post Primary',d['Educ: Post Primary'])}${row('(b) Secondary School',d['Educ: Secondary School'])}
+  ${row('(c) University etc',d['Educ: University etc'])}${row('(d) Professional Certificates',d['Educ: Professional Certificates'])}
+  ${row('(e) Additional Qualification',d['Educ: Additional Qualification'])}</table>
+  <h3>8. Personal Details</h3><table>
+  ${row('Date of Birth',d['Date of Birth'])}${row('State of Origin',d['State of Origin'])}${row('Nationality',d['Nationality'])}
+  ${row('Age',d['Age'])}${row('CSC File No.',d['CSC File No.'])}${row('Oracle No.',d['Oracle No.'])}</table>
+  <h3>9–11. Service Record</h3><table>
+  ${row('Date issued last query',d['Date issued last query'])}${row('Facing disciplinary action?',d['Facing disciplinary action?'])}
+  ${row('Pending request/appeal/appraisal',d['Pending request/appeal/appraisal'])}</table>
+  <h3>12. Performance Appraisal (last 3 years)</h3><table>
+  ${row('2024 Score',d['Appraisal 2024 Score'])}${row('2025 Score',d['Appraisal 2025 Score'])}${row('2026 Score',d['Appraisal 2026 Score'])}</table>
+  <div class="cert"><h3 style="margin-top:0">13. Certification — Director, Admin. &amp; Human Resource</h3>
+  <p class="note">D(A&amp;HR) is to endorse and stamp ONLY after verifying correctness and completeness of the officer's information.</p>
+  <table>${row('Name',d['Certifying Officer Name'])}${row('Rank',d['Certifying Officer Rank'])}
+  ${row('Telephone',d['Certifying Officer Telephone'])}${row('Date',d['Certification Date'])}</table>
+  <div class="sig"><div>_______________________<br>Signature</div><div>_______________________<br>Official Stamp</div></div></div>
+  <p class="note">Generated ${new Date().toLocaleString()} · Y2027 Promotion Exercise · Lagos State Civil Service Commission</p>
+  </body></html>`;
+  const blob = new Blob([html], {type:'application/msword'});
+  const safe = (d['Name (Surname first)']||'candidate').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'candidate';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `FormA_Brief_${safe}.doc`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
 
 document.getElementById('forgot-btn').addEventListener('click', async ()=>{
   const email = document.getElementById('forgot-email').value.trim();
