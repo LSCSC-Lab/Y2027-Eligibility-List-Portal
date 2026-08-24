@@ -313,8 +313,13 @@
       </div>
       <p class="hint" style="margin-top:6px;">Signature/stamp is applied on the printed copy after download.</p>
 
+      <div class="auth-check" style="margin-top:14px;">
+        <input type="checkbox" id="brief-consent">
+        <label for="brief-consent">I confirm that the information provided in this Form A is <b>true, correct and complete</b>, and I am sending it to my <b>MDA (Department/Ministry)</b> for approval and onward transmission to the Lagos State Civil Service Commission. I understand I am responsible for the accuracy of these details.</label>
+      </div>
+
       <div class="btnbar" style="margin-top:18px;">
-        <button class="btn btn-primary" id="brief-submit-btn">Save &amp; Download Form A</button>
+        <button class="btn btn-primary" id="brief-submit-btn" disabled>Send to MDA, Save &amp; Download Form A</button>
         <button class="btn btn-ghost" id="brief-back-btn">Back to Sign In</button>
       </div>
     </div>
@@ -1182,10 +1187,22 @@ function resizePhoto(file, onOk, onErr){
 }
 
 // Open / close Form A.
-function openBriefForm(){ showPanel('brief'); window.scrollTo(0,0); }
+function openBriefForm(){
+  // Reset consent each time the form is opened so the officer must re-affirm.
+  const chk = document.getElementById('brief-consent'); const btn = document.getElementById('brief-submit-btn');
+  if (chk){ chk.checked = false; }
+  if (btn){ btn.disabled = true; btn.textContent = 'Send to MDA, Save & Download Form A'; }
+  showPanel('brief'); window.scrollTo(0,0);
+}
 document.getElementById('brief-open').addEventListener('click', openBriefForm);
 document.getElementById('brief-open').addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openBriefForm(); } });
 document.getElementById('brief-back-btn').addEventListener('click', ()=>showPanel('login'));
+// Consent gate: the submit button is enabled only after the officer confirms the information is true.
+(function(){
+  const chk = document.getElementById('brief-consent');
+  const btn = document.getElementById('brief-submit-btn');
+  if (chk && btn) chk.addEventListener('change', ()=>{ btn.disabled = !chk.checked; });
+})();
 
 // Collect all Form A fields with labels for validation + output.
 function collectBriefForm(){
@@ -1224,6 +1241,12 @@ function collectBriefForm(){
 }
 
 document.getElementById('brief-submit-btn').addEventListener('click', async ()=>{
+  // Consent is mandatory.
+  const consent = document.getElementById('brief-consent');
+  if (!consent || !consent.checked){
+    showMsg('brief-msg','err','Please tick the confirmation box to certify the information is true before sending.');
+    return;
+  }
   const data = collectBriefForm();
   // Every field is compulsory.
   const missing = Object.keys(data).filter(k=>!String(data[k]).trim());
@@ -1239,26 +1262,38 @@ document.getElementById('brief-submit-btn').addEventListener('click', async ()=>
   if (!BRIEF_PHOTO){ showMsg('brief-msg','err','Please upload your passport photograph (top-right of the form).'); document.getElementById('panel-brief').scrollIntoView({block:'start'}); return; }
 
   const btn = document.getElementById('brief-submit-btn'); const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Saving…';
-  showMsg('brief-msg','warn','Saving your Brief on Candidate…');
+  btn.disabled = true; btn.textContent = 'Sending to MDA…';
+  showMsg('brief-msg','warn','Sending your Form A to your MDA for approval…');
 
-  // 1) Save to the Google Sheet (best-effort). 2) Always download a copy.
+  // 1) Send to the MDA (save to the Sheet). 2) Download a copy. 3) Print.
   let saved = false, saveMsg = '';
   try{
     const res = await callScript({action:'submitBrief', brief:data, photo:BRIEF_PHOTO});
     if (res && res.success){ saved = true; }
-    else { saveMsg = (res && res.message) ? res.message : 'Save was not confirmed by the server.'; }
+    else { saveMsg = (res && res.message) ? res.message : 'Send was not confirmed by the server.'; }
   }catch(err){ saveMsg = err.message; }
 
+  // Always give the officer their copy: download + print.
   downloadBriefDoc(data, BRIEF_PHOTO);
+  printBriefs([briefFromData(data, BRIEF_PHOTO)]);
 
-  btn.disabled = false; btn.textContent = orig;
   if (saved){
-    showMsg('brief-msg','ok','Your Brief on Candidate was saved and a copy has been downloaded. You may print, sign/stamp (item 13), and submit it.');
+    // Lock the form after a successful send to prevent accidental duplicate submissions.
+    btn.textContent = 'Sent to MDA ✓';
+    showMsg('brief-msg','ok','Your Form A has been sent to your MDA for approval, and a copy has been downloaded and opened for printing. Your MDA officer will review and authorise it to the Commission.');
   } else {
-    showMsg('brief-msg','warn',`A copy was downloaded to your device. Online save was not confirmed (${saveMsg||'no connection'}), so please ensure the downloaded copy reaches the Commission.`);
+    btn.disabled = false; btn.textContent = orig;
+    showMsg('brief-msg','warn',`A copy was downloaded and opened for printing. However, sending to your MDA was not confirmed (${saveMsg||'no connection'}). Please try again or ensure the downloaded copy reaches your MDA.`);
   }
 });
+
+// Turn the flat form-data object into the shape printBriefs expects (same keys + photo).
+function briefFromData(d, photo){
+  const b = Object.assign({}, d);
+  b['Photo (data URL)'] = photo || '';
+  b['Status'] = 'Pending';
+  return b;
+}
 
 // Build a self-contained, printable HTML document of Form A and trigger download.
 function downloadBriefDoc(d, photo){
