@@ -61,6 +61,18 @@
   .brief-box:hover .click{background:var(--gold-dark,#96701f);}
   .brief-sec{font-family:var(--sans);font-weight:700;color:var(--navy);font-size:14px;
     border-left:3px solid var(--gold);padding-left:9px;margin:20px 0 10px;text-transform:uppercase;letter-spacing:.5px;}
+  /* Candidate passport photo box (top-right of Form A) */
+  .photo-box{position:absolute;top:16px;right:22px;width:118px;text-align:center;z-index:2;}
+  .photo-frame{width:118px;height:142px;border:2px solid var(--navy);border-radius:4px;background:#F6F5F1;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;transition:box-shadow .15s ease;}
+  .photo-frame:hover{box-shadow:0 3px 10px rgba(15,44,76,.2);}
+  .photo-frame img{width:100%;height:100%;object-fit:cover;}
+  .photo-frame .ph{font-size:11px;color:var(--muted,#5B6572);line-height:1.4;padding:6px;font-family:var(--sans);}
+  .photo-cap{font-size:10.5px;color:var(--muted,#5B6572);margin-top:5px;font-family:var(--sans);line-height:1.3;}
+  .photo-cap .req-star{color:var(--err);}
+  .photo-actions{margin-top:5px;}
+  .photo-actions button{font-size:10.5px;padding:3px 8px;}
+  @media(max-width:720px){ .photo-box{position:static;width:118px;margin:0 auto 14px;} }
   @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
 
   .card{background:#fff;border:1px solid var(--paper-line);border-radius:6px;padding:20px 22px;margin-bottom:18px;box-shadow:0 1px 2px rgba(15,44,76,.04);}
@@ -198,7 +210,15 @@
 
   <!-- =================== FORM A — BRIEF ON CANDIDATE =================== -->
   <section class="panel" id="panel-brief">
-    <div class="card" style="max-width:900px;margin:0 auto;">
+    <div class="card" style="max-width:900px;margin:0 auto;position:relative;">
+      <div class="photo-box">
+        <div class="photo-frame" id="photo-frame" role="button" tabindex="0" aria-label="Upload candidate photograph">
+          <span class="ph" id="photo-ph">Click to upload passport photograph</span>
+        </div>
+        <div class="photo-cap">Passport photograph <span class="req-star">*</span></div>
+        <div class="photo-actions"><button class="btn btn-ghost" id="photo-remove" style="display:none;">Remove</button></div>
+        <input type="file" id="photo-input" accept="image/png,image/jpeg" style="display:none;">
+      </div>
       <div style="text-align:center;border-bottom:2px solid var(--gold);padding-bottom:14px;margin-bottom:6px;">
         <div style="font-family:var(--serif);font-weight:700;color:var(--navy);font-size:16px;line-height:1.5;">
           LAGOS STATE GOVERNMENT · CIVIL SERVICE COMMISSION<br>YEAR 2027 PROMOTION EXERCISE
@@ -1041,7 +1061,64 @@ document.getElementById('goto-reset-code').addEventListener('click', ()=>showPan
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', ()=>{ const p=el.selectionStart; el.value=el.value.toUpperCase(); try{el.setSelectionRange(p,p);}catch(e){} });
   });
+
+  // Candidate passport photograph — upload, resize/compress, preview.
+  const frame = document.getElementById('photo-frame');
+  const fileInput = document.getElementById('photo-input');
+  const removeBtn = document.getElementById('photo-remove');
+  if (frame && fileInput){
+    frame.addEventListener('click', ()=>fileInput.click());
+    frame.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fileInput.click(); } });
+    fileInput.addEventListener('change', ()=>{
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      if (!/^image\/(png|jpe?g)$/.test(file.type)){ showMsg('brief-msg','err','Photograph must be a PNG or JPG image.'); return; }
+      if (file.size > 8*1024*1024){ showMsg('brief-msg','err','Photograph is too large (max 8 MB). Please choose a smaller image.'); return; }
+      resizePhoto(file, dataUrl=>{
+        BRIEF_PHOTO = dataUrl;
+        frame.innerHTML = `<img src="${dataUrl}" alt="Candidate photograph">`;
+        removeBtn.style.display = '';
+        showMsg('brief-msg','ok','Photograph attached.');
+      }, err=>{ showMsg('brief-msg','err','Could not read that image: '+err); });
+    });
+    removeBtn.addEventListener('click', ()=>{
+      BRIEF_PHOTO = '';
+      fileInput.value = '';
+      frame.innerHTML = '<span class="ph" id="photo-ph">Click to upload passport photograph</span>';
+      removeBtn.style.display = 'none';
+    });
+  }
 })();
+
+// Holds the candidate photo as a compressed JPEG data URL (or '' if none).
+let BRIEF_PHOTO = '';
+
+// Resize an image file to passport proportions (~330x400 max), compress to JPEG,
+// and return a data URL. Keeps stored size small enough for a Google Sheet cell.
+function resizePhoto(file, onOk, onErr){
+  const reader = new FileReader();
+  reader.onerror = ()=>onErr('read failed');
+  reader.onload = ()=>{
+    const img = new Image();
+    img.onerror = ()=>onErr('decode failed');
+    img.onload = ()=>{
+      const maxW = 330, maxH = 400;
+      let w = img.width, h = img.height;
+      const scale = Math.min(maxW/w, maxH/h, 1);
+      w = Math.round(w*scale); h = Math.round(h*scale);
+      const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img, 0, 0, w, h);
+      let quality = 0.82, dataUrl = canvas.toDataURL('image/jpeg', quality);
+      // Keep under ~45 KB so it fits comfortably in a sheet cell.
+      while (dataUrl.length > 45000 && quality > 0.4){ quality -= 0.1; dataUrl = canvas.toDataURL('image/jpeg', quality); }
+      onOk(dataUrl);
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
 
 // Open / close Form A.
 function openBriefForm(){ showPanel('brief'); window.scrollTo(0,0); }
@@ -1097,6 +1174,8 @@ document.getElementById('brief-submit-btn').addEventListener('click', async ()=>
   // Light sanity checks.
   if (!/^\d{4,10}$/.test(data['Oracle No.'])){ showMsg('brief-msg','err','Oracle No. must be 4–10 digits.'); return; }
   if (!/^0\d{10}$/.test(data['Certifying Officer Telephone'].replace(/^(\+?234)/,'0'))){ showMsg('brief-msg','err','Certifying officer telephone must be an 11-digit Nigerian number.'); return; }
+  // Passport photograph is required.
+  if (!BRIEF_PHOTO){ showMsg('brief-msg','err','Please upload your passport photograph (top-right of the form).'); document.getElementById('panel-brief').scrollIntoView({block:'start'}); return; }
 
   const btn = document.getElementById('brief-submit-btn'); const orig = btn.textContent;
   btn.disabled = true; btn.textContent = 'Saving…';
@@ -1105,12 +1184,12 @@ document.getElementById('brief-submit-btn').addEventListener('click', async ()=>
   // 1) Save to the Google Sheet (best-effort). 2) Always download a copy.
   let saved = false, saveMsg = '';
   try{
-    const res = await callScript({action:'submitBrief', brief:data});
+    const res = await callScript({action:'submitBrief', brief:data, photo:BRIEF_PHOTO});
     if (res && res.success){ saved = true; }
     else { saveMsg = (res && res.message) ? res.message : 'Save was not confirmed by the server.'; }
   }catch(err){ saveMsg = err.message; }
 
-  downloadBriefDoc(data);
+  downloadBriefDoc(data, BRIEF_PHOTO);
 
   btn.disabled = false; btn.textContent = orig;
   if (saved){
@@ -1121,14 +1200,16 @@ document.getElementById('brief-submit-btn').addEventListener('click', async ()=>
 });
 
 // Build a self-contained, printable HTML document of Form A and trigger download.
-function downloadBriefDoc(d){
+function downloadBriefDoc(d, photo){
   const row = (label,val)=>`<tr><td class="l">${escapeHtml(label)}</td><td class="v">${escapeHtml(val)}</td></tr>`;
+  const photoHtml = photo ? `<img class="photo" src="${photo}" alt="Candidate photograph">` : '';
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Form A — Brief on Candidate</title>
   <style>
     body{font-family:Georgia,serif;color:#1B2430;max-width:800px;margin:24px auto;padding:0 24px;}
-    .hd{text-align:center;border-bottom:2px solid #B9892E;padding-bottom:10px;margin-bottom:16px;}
+    .hd{text-align:center;border-bottom:2px solid #B9892E;padding-bottom:10px;margin-bottom:16px;position:relative;}
     .hd .o{font-weight:700;color:#0F2C4C;font-size:15px;line-height:1.5;}
     .hd .t{font-weight:700;color:#0F2C4C;font-size:19px;margin-top:6px;}
+    .photo{position:absolute;top:0;right:0;width:104px;height:126px;object-fit:cover;border:2px solid #0F2C4C;border-radius:3px;}
     h3{color:#0F2C4C;border-left:3px solid #B9892E;padding-left:8px;font-size:14px;margin:18px 0 6px;text-transform:uppercase;}
     table{width:100%;border-collapse:collapse;margin-bottom:6px;}
     td{border:1px solid #C9CFD8;padding:6px 9px;font-size:13px;vertical-align:top;}
@@ -1138,7 +1219,7 @@ function downloadBriefDoc(d){
     .note{font-size:11px;color:#5B6572;margin-top:10px;}
     @media print{body{margin:0;}}
   </style></head><body>
-  <div class="hd"><div class="o">LAGOS STATE GOVERNMENT · CIVIL SERVICE COMMISSION<br>YEAR 2027 PROMOTION EXERCISE</div>
+  <div class="hd">${photoHtml}<div class="o">LAGOS STATE GOVERNMENT · CIVIL SERVICE COMMISSION<br>YEAR 2027 PROMOTION EXERCISE</div>
   <div class="t">BRIEF ON CANDIDATE — FORM A</div></div>
   <h3>1. Candidate</h3><table>${row('Name (Surname first)',d['Name (Surname first)'])}${row('Department/Ministry',d['Department/Ministry'])}</table>
   <h3>2–6. Appointments &amp; Designations</h3><table>
