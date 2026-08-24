@@ -288,7 +288,7 @@
       <div class="grid">
         <div class="field"><label class="req">Full Name</label><input type="text" id="nu-name"></div>
         <div class="field"><label class="req">Email</label><input type="text" id="nu-email"></div>
-        <div class="field"><label class="req">MDA</label><input type="text" id="nu-mda"></div>
+        <div class="field"><label class="req">Department/Ministry (MDA)</label><select id="nu-mda"></select></div>
         <div class="field"><label class="req">Role</label>
           <select id="nu-role"><option value="user">User (MDA staff)</option><option value="admin">Administrator</option></select>
         </div>
@@ -365,8 +365,149 @@ let AUTH_TOKEN = null;
    FIELD SCHEMA
    ========================================================================= */
 const GRADE_OPTIONS = ['01','02','03','04','05','06','07','08','09','10','12','13','14','15','16','17']; // GL11 is not used in the Lagos State structure
+
+/* =========================================================================
+   LAGOS STATE MDA REFERENCE (Ministries / Departments / Agencies)
+   Compiled from public Lagos State Government / Civil Service Commission
+   sources. Grouped for the MDA picker. This is a working reference, not an
+   official CSC gazette — the Commission can add or amend entries as needed.
+   ========================================================================= */
+const LAGOS_MDA_GROUPS = [
+  { group:'Ministries', items:[
+    'Ministry of Agriculture and Food Systems',
+    'Ministry of Basic and Secondary Education',
+    'Ministry of Commerce, Cooperatives, Trade and Investment',
+    'Ministry of Economic Planning and Budget',
+    'Ministry of Energy and Mineral Resources',
+    'Ministry of the Environment and Water Resources',
+    'Ministry of Establishments and Training',
+    'Ministry of Finance',
+    'Ministry of Health',
+    'Ministry of Home Affairs',
+    'Ministry of Housing',
+    'Ministry of Information and Strategy',
+    'Ministry of Innovation, Science and Technology',
+    'Ministry of Justice',
+    'Ministry of Local Government, Chieftaincy and Community Affairs',
+    'Ministry of Physical Planning and Urban Development',
+    'Ministry of Special Duties and Intergovernmental Relations',
+    'Ministry of Tertiary Education',
+    'Ministry of Tourism, Arts and Culture',
+    'Ministry of Transportation',
+    'Ministry of Wealth Creation and Employment',
+    'Ministry of Women Affairs and Poverty Alleviation',
+    'Ministry of Works and Infrastructure',
+    'Ministry of Waterfront Infrastructure Development',
+    'Ministry of Youth and Social Development',
+  ]},
+  { group:'Offices, Departments & Central Bodies', items:[
+    'Office of the Governor',
+    'Office of the Deputy Governor',
+    'Office of the Head of Service',
+    'Civil Service Commission',
+    'Office of the Auditor-General (State)',
+    'Office of the Auditor-General (Local Government)',
+    'Office of Transformation, Creativity and Innovation',
+    'Office of Sustainable Development Goals and Investment',
+    'Office of Civic Engagement',
+    'Office of Political and Legislative Powers Bureau',
+    'Public Service Office (Head of Service)',
+    'Directorate of Public Procurement (Public Procurement Agency)',
+    'Lagos State Pensions Commission (LASPEC)',
+    'Lagos State House of Assembly (Service Commission)',
+    'Judicial Service Commission',
+    'Local Government Service Commission',
+    'Lagos State Audit Service Commission',
+  ]},
+  { group:'Agencies, Parastatals & Corporations', items:[
+    'Lagos State Internal Revenue Service (LIRS)',
+    'Lagos State Traffic Management Authority (LASTMA)',
+    'Lagos State Emergency Management Agency (LASEMA)',
+    'Lagos State Environmental Protection Agency (LASEPA)',
+    'Lagos State Waste Management Authority (LAWMA)',
+    'Lagos Metropolitan Area Transport Authority (LAMATA)',
+    'Lagos State Signage and Advertisement Agency (LASAA)',
+    'Lagos State Physical Planning Permit Authority (LASPPPA)',
+    'Lagos State Building Control Agency (LASBCA)',
+    'Lagos State Waterways Authority (LASWA)',
+    'Lagos State Infrastructure Maintenance and Regulatory Agency (LASIMRA)',
+    'Lagos State Public Works Corporation (LSPWC)',
+    'Lagos State Water Corporation',
+    'Lagos State Sports Commission',
+    'Lagos State Security Trust Fund (LSSTF)',
+    'Lagos State Office of the Public Defender (OPD)',
+    'Lagos State Residents Registration Agency (LASRRA)',
+    'Lagos State Health Management Agency (LASHMA)',
+    'Lagos State Health Service Commission',
+    'Lagos State Teaching Service Commission (TESCOM)',
+    'Lagos State Universal Basic Education Board (SUBEB)',
+    'Lagos State Examinations Board',
+    'Lagos State Scholarship Board',
+    'Lagos State Library Board',
+    'Lagos State Fire and Rescue Service',
+    'Lagos State Neighbourhood Safety Corps (LNSC)',
+    'Lagos State Parks and Gardens Agency (LASPARK)',
+    'Lagos State Environmental Sanitation Corps (LAGESC / KAI)',
+    'Lagos State Ambulance Service (LASAMBUS)',
+    'Lagos State Drivers\u2019 Institute (LASDRI)',
+    'Lagos State Motor Vehicle Administration Agency (MVAA)',
+    'Lagos State Lands Bureau',
+    'Lagos State Real Estate Regulatory Authority (LASRERA)',
+    'Lagos State Public Procurement Agency (PPA)',
+    'Lagos State Employment Trust Fund (LSETF)',
+    'Lagos State Records and Archives Bureau (LARAB)',
+    'Lagos State Agricultural Development Authority (LSADA)',
+    'Lagos State Property Development Corporation (LSDPC)',
+    'Lagos State Development and Property Corporation',
+    'Lagos State Sports Council',
+    'Lagos State Television / Radio (LTV / Radio Lagos / Eko FM)',
+    'Lagos State University (LASU)',
+    'Lagos State University of Science and Technology (LASUSTECH)',
+    'Lagos State University of Education (LASUED)',
+    'Lagos State College of Health Technology',
+    'Lagos State Polytechnic (defunct \u2013 see LASUSTECH)',
+    'Lagos State Ferry Services Company (LAGFERRY)',
+    'Lagos Bus Services Limited (LBSL)',
+    'Lagos State Parking Authority (LASPA)',
+    'Lagos State Safety Commission',
+    'Lagos State Water Regulatory Commission',
+    'Lagos State Electricity Board / Power',
+    'Lagos State Primary Health Care Board',
+    'Lagos State AIDS Control Agency (LSACA)',
+    'Lagos State Blood Transfusion Service',
+    'Other (specify in Remarks)',
+  ]},
+];
+// Flat set of valid MDA names for validation lookups.
+const MDA_SET = new Set();
+LAGOS_MDA_GROUPS.forEach(g=>g.items.forEach(n=>MDA_SET.add(n)));
+function isKnownMDA(name){ return MDA_SET.has(String(name||'').trim()); }
+// Guarantee a <select> contains `value` as an option (adds it under a fallback
+// group if it's a legacy/free-text MDA not in the reference list).
+function ensureMDAOption(sel, value){
+  if (!value) return;
+  const exists = Array.from(sel.options).some(o=>o.value===value);
+  if (!exists){
+    const og = document.createElement('optgroup'); og.label='Assigned (legacy)';
+    const op = document.createElement('option'); op.value=value; op.textContent=value; op.selected=true;
+    og.appendChild(op); sel.appendChild(og);
+  }
+}
+// Build <optgroup> markup for a grouped MDA <select>. `selected` pre-selects a value.
+function mdaOptionsHTML(selected){
+  let html = '<option value="">Select MDA…</option>';
+  LAGOS_MDA_GROUPS.forEach(g=>{
+    html += `<optgroup label="${escapeHtml(g.group)}">`;
+    g.items.forEach(n=>{
+      const sel = (n===selected) ? ' selected' : '';
+      html += `<option value="${escapeHtml(n)}"${sel}>${escapeHtml(n)}</option>`;
+    });
+    html += '</optgroup>';
+  });
+  return html;
+}
 const FIELDS = [
-  { key:'mda', label:'MDA', type:'text', required:true, col:'MDA' },
+  { key:'mda', label:'Department/Ministry (MDA)', type:'mda', required:true, col:'MDA' },
   { key:'surname_first', label:'Names (Surname First)', type:'text', required:true, col:'Names (Surname First)' },
   { key:'csc_file_no', label:'CSC File No', type:'text', required:true, col:'CSC File No', mono:true },
   { key:'oracle_no', label:'Oracle No', type:'text', required:true, col:'Oracle No', mono:true },
@@ -574,7 +715,11 @@ function validateRecord(rec){
     const raw = rec[f.key];
     if (f.required && (raw===undefined||raw===null||String(raw).trim()==='')) errors[f.key] = `${f.label} is required.`;
   });
-  if (rec.mda && String(rec.mda).trim().length<2) errors.mda = 'MDA name looks too short.';
+  if (rec.mda){
+    const mdaVal = String(rec.mda).trim();
+    if (mdaVal.length<2) errors.mda = 'Select a Department/Ministry (MDA).';
+    else if (!isKnownMDA(mdaVal)) warnings.mda = 'MDA is not in the Lagos State reference list — please confirm it is correct.';
+  }
   // Names and CSC File No are always stored in uppercase.
   if (rec.surname_first){
     norm.surname_first = String(rec.surname_first).trim().toUpperCase();
@@ -706,8 +851,12 @@ function updateAuthUI(){
   // Lock/unlock MDA field in Single Entry based on role
   const mdaInput = document.getElementById('f_mda');
   if (mdaInput){
-    if (loggedIn && !admin){ mdaInput.value = CURRENT_USER.mda; mdaInput.disabled = true; }
-    else { mdaInput.disabled = false; }
+    if (loggedIn && !admin){
+      ensureMDAOption(mdaInput, CURRENT_USER.mda);
+      mdaInput.value = CURRENT_USER.mda; mdaInput.disabled = true;
+    } else {
+      mdaInput.disabled = false;
+    }
   }
   const hint = document.getElementById('bulk-mda-hint');
   if (hint){
@@ -838,7 +987,10 @@ FIELDS.forEach(f=>{
   const lab = document.createElement('label'); lab.textContent=f.label; if(f.required) lab.classList.add('req');
   wrap.appendChild(lab);
   let input;
-  if (f.type==='select'){
+  if (f.type==='mda'){
+    input = document.createElement('select');
+    input.innerHTML = mdaOptionsHTML('');
+  } else if (f.type==='select'){
     input = document.createElement('select');
     input.innerHTML = '<option value="">Select…</option>'+f.options.map(o=>`<option value="${o}">${o}</option>`).join('');
   } else {
@@ -958,13 +1110,13 @@ document.getElementById('single-form').addEventListener('submit', e=>{
   renderQueue();
   document.getElementById('single-form').reset();
   resetCadrePickers();
-  if (CURRENT_USER && !isAdminRole()) document.getElementById('f_mda').value = CURRENT_USER.mda;
+  if (CURRENT_USER && !isAdminRole()){ const m=document.getElementById('f_mda'); ensureMDAOption(m, CURRENT_USER.mda); m.value = CURRENT_USER.mda; }
   showMsg('single-msg', warnKeys.length?'warn':'ok', warnKeys.length ? `Added to queue with ${warnKeys.length} soft warning(s): ${Object.values(warnings).join(' ')}` : 'Record validated and added to the queue.');
 });
 document.getElementById('single-clear').addEventListener('click',()=>{
   document.getElementById('single-form').reset();
   resetCadrePickers();
-  if (CURRENT_USER && !isAdminRole()) document.getElementById('f_mda').value = CURRENT_USER.mda;
+  if (CURRENT_USER && !isAdminRole()){ const m=document.getElementById('f_mda'); ensureMDAOption(m, CURRENT_USER.mda); m.value = CURRENT_USER.mda; }
   document.querySelectorAll('#single-fields .field').forEach(w=>{w.classList.remove('invalid'); const em=w.querySelector('.err-msg'); if(em) em.textContent='';});
   document.getElementById('single-msg').className='msgbox';
 });
@@ -1270,6 +1422,9 @@ document.getElementById('chart-timeline').addEventListener('click', ()=>{
    ========================================================================= */
 (function initView(){
   const params = new URLSearchParams(window.location.search);
+  // Populate the admin "Create Account" MDA picker once.
+  const nuMda = document.getElementById('nu-mda');
+  if (nuMda) nuMda.innerHTML = mdaOptionsHTML('');
   updateAuthUI();
   if (params.get('reset') && params.get('email')) showPanel('reset');
   else if (!isConfigured()) showPanel('settings');   // one-time setup, only when no backend URL yet
