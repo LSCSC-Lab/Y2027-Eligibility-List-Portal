@@ -878,7 +878,7 @@ function validateRecord(rec){
   }
   if (rec.csc_file_no){
     norm.csc_file_no = String(rec.csc_file_no).trim().toUpperCase();
-    if (!/^[A-Z0-9\/\-]{3,20}$/.test(norm.csc_file_no)) errors.csc_file_no = 'Use letters, numbers, "/" or "-" only (3–20 characters).';
+    if (!/^[A-Z0-9\/\-,]{3,20}$/.test(norm.csc_file_no)) errors.csc_file_no = 'Use letters, numbers, "/", "-" or "," only (3–20 characters).';
   }
   if (rec.oracle_no && !/^\d{4,10}$/.test(String(rec.oracle_no).trim())) errors.oracle_no = 'Oracle No must be numeric (4–10 digits).';
 
@@ -1881,7 +1881,7 @@ document.getElementById('bulk-template-link').addEventListener('click', (e)=>{
   // data columns using the Commission's exact header wording (three columns are
   // simply "GRADE LEVEL"). Column order is fixed and read back by position.
   const SAMPLE = {
-    surname_first:'AKINWANDE Grace Town', csc_file_no:'P35.410', oracle_no:'205458',
+    surname_first:'AKINWANDE Grace Town', csc_file_no:'P35,410', oracle_no:'205458',
     post_1st_appt:'SENIOR EXECUTIVE', grade_1st:'09', date_1st_appt:'23-Jan-2020', date_confirmation:'23-Jan-2022',
     present_post:'PRINCIPAL EXECUTIVE', grade_present:'10', date_present_appt:'01-Jul-2023',
     promotion_post:'PRINCIPAL', grade_promotion:'12', proposed_notional_date:'01-Jul-2026', proposed_financial_date:'01-Jul-2026',
