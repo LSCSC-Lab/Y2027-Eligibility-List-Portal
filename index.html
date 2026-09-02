@@ -539,7 +539,7 @@
 /* =========================================================================
    CONFIG
    ========================================================================= */
-const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKTcVbT3zHq4TeCmRHWjl9aPn6xxqH5SNrfXEjvt7Yw9yAAbitMpBqR5p0UWSemitk/exec"; // hardcode your deployed Apps Script Web App URL here for a permanent build
+const DEFAULT_SCRIPT_URL = ""; // hardcode your deployed Apps Script Web App URL here for a permanent build
 // Resolve the backend URL: prefer the hardcoded one, else a URL saved by a
 // previous one-time setup on this browser.
 let SAVED_SCRIPT_URL = "";
@@ -644,6 +644,30 @@ const FIELDS = [
   { key:'mobile_no', label:'Mobile No (WhatsApp)', type:'tel', required:true, col:'Mobile No' },
   { key:'disability', label:'People Living with Disability (Type)', type:'text', required:true, col:'Disability', placeholder:'e.g. None / Visually Impaired' },
   { key:'remarks', label:'Remarks', type:'text', required:false, col:'Remarks' },
+];
+// Bulk template column layout — EXACT Lagos CSC "MDA" template order and header
+// wording (S/N is added separately; MDA is a title line, not a column). The
+// bulk-upload reader maps columns to fields by POSITION using this array, so the
+// three repeated "GRADE LEVEL" headers are unambiguous.
+const BULK_TEMPLATE_COLS = [
+  { header:'NAMES( SURNAME FIRST)', key:'surname_first' },
+  { header:'CSC FILE NO', key:'csc_file_no' },
+  { header:'ORACLE NO', key:'oracle_no' },
+  { header:'POST OF 1ST APPT', key:'post_1st_appt' },
+  { header:'GRADE LEVEL', key:'grade_1st' },
+  { header:'DATE OF 1ST APPT', key:'date_1st_appt' },
+  { header:'DATE OF CONFIRMATION', key:'date_confirmation' },
+  { header:'PRESENT POST /CADRE', key:'present_post' },
+  { header:'GRADE LEVEL', key:'grade_present' },
+  { header:'DATE OF PRESENT APPT', key:'date_present_appt' },
+  { header:'PROMOTION POST/CADRE', key:'promotion_post' },
+  { header:'GRADE LEVEL', key:'grade_promotion' },
+  { header:'PROPOSED NOTIONAL DATE', key:'proposed_notional_date' },
+  { header:'PROPOSED FINANCIAL DATE', key:'proposed_financial_date' },
+  { header:'OFFICIAL/ FUNCTIONAL EMAIL - ADDRESS', key:'official_email' },
+  { header:'MOBILE NO (WHATSAPP)', key:'mobile_no' },
+  { header:'PEOPLE LIVING WITH DISABILITY (TYPE)', key:'disability' },
+  { header:'REMARKS', key:'remarks' },
 ];
 // Post fields that use the cascading Cadre → Post picker instead of free text, and
 // their paired grade-level field (auto-derived from the chosen post, not typed).
@@ -990,8 +1014,8 @@ function updateAuthUI(){
   const hint = document.getElementById('bulk-mda-hint');
   if (hint){
     hint.textContent = (loggedIn && !admin)
-      ? `File must follow the Y2027 template column order. Every uploaded row will be recorded under your MDA (${CURRENT_USER.mda}), regardless of what the file's MDA column contains.`
-      : `File must follow the Y2027 template column order.`;
+      ? `Use the downloaded blank template. Write your MDA beside the "MDA:" title line and fill one candidate per row under the S/N column. Every row will be recorded under your MDA (${CURRENT_USER.mda}).`
+      : `Use the downloaded blank template. Write the MDA beside the "MDA:" title line and fill one candidate per row under the S/N column.`;
   }
 }
 
@@ -1750,8 +1774,6 @@ document.getElementById('single-submit-batch').addEventListener('click', async (
    BULK UPLOAD
    ========================================================================= */
 let bulkRows = [];
-const HEADER_ALIASES = {};
-FIELDS.forEach(f=>{ HEADER_ALIASES[normHeader(f.col)] = f.key; HEADER_ALIASES[normHeader(f.label)] = f.key; });
 function normHeader(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
 
 document.getElementById('bulk-file').addEventListener('change', async (e)=>{
@@ -1759,18 +1781,48 @@ document.getElementById('bulk-file').addEventListener('change', async (e)=>{
   const data = await file.arrayBuffer();
   const wb = XLSX.read(data, {type:'array', cellDates:true});
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:true});
-  if (!rows.length){ alert('No data rows found in that file.'); return; }
-  const sampleKeys = Object.keys(rows[0]);
-  const keyMap = {};
-  sampleKeys.forEach(k=>{ const norm=normHeader(k); const match=HEADER_ALIASES[norm]; if(match) keyMap[k]=match; });
-  bulkRows = rows.map((row,i)=>{
-    const rec = { _rowNum: i+2 };
+  // Read as a raw grid so we can honour the exact template layout (MDA title
+  // line, S/N column, three repeated "GRADE LEVEL" headers matched by position).
+  const grid = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true, blankrows:true});
+  if (!grid.length){ alert('No data found in that file.'); return; }
+
+  // Locate the header row: the first row whose first cell is "S/N".
+  const cell = v => String(v==null?'':v).trim();
+  let headerIdx = grid.findIndex(r => normHeader(r[0])==='sn');
+  // Fallback: a row that contains a recognisable header like "NAMES".
+  if (headerIdx === -1) headerIdx = grid.findIndex(r => r.some(c=>normHeader(c).startsWith('names')));
+  if (headerIdx === -1){ alert('Could not find the template header row (the row beginning with "S/N"). Please use the downloaded blank template.'); return; }
+
+  // Read the MDA from a title line above the header, e.g. a cell "MDA:" with the
+  // name beside it, or a line like "MDA: Ministry of Health".
+  let sheetMDA = '';
+  for (let r=0; r<headerIdx; r++){
+    const row = grid[r].map(cell);
+    const ci = row.findIndex(c => normHeader(c)==='mda' || normHeader(c).startsWith('mda'));
+    if (ci !== -1){
+      // value beside the label, or text after "MDA:" in the same cell
+      let after = row.slice(ci+1).find(c=>c) || '';
+      if (!after){ const m = row[ci].match(/mda\s*:?\s*(.+)/i); if (m && m[1].trim()) after = m[1].trim(); }
+      if (after){ sheetMDA = after; break; }
+    }
+  }
+
+  // Map data columns to field keys by POSITION: column 0 is S/N (skip), columns
+  // 1..N follow BULK_TEMPLATE_COLS in order.
+  const dataRows = grid.slice(headerIdx+1).filter(r => r.some(c=>cell(c)!=='' ) && cell(r[0])!=='');
+  bulkRows = dataRows.map((row,i)=>{
+    const rec = { _rowNum: headerIdx + 2 + i };
     FIELDS.forEach(f=>{ rec[f.key]=''; });
-    Object.entries(row).forEach(([k,v])=>{ const fk=keyMap[k]; if(fk) rec[fk] = (v instanceof Date)?v:String(v).trim(); });
-    if (CURRENT_USER && !isAdminRole()) rec.mda = CURRENT_USER.mda; // MDA locked to account
+    BULK_TEMPLATE_COLS.forEach((colspec, idx)=>{
+      const v = row[idx+1]; // +1 to skip the S/N column
+      rec[colspec.key] = (v instanceof Date) ? v : cell(v);
+    });
+    // MDA: locked to the signed-in user's MDA for non-admins; else from the title line.
+    if (CURRENT_USER && !isAdminRole()) rec.mda = CURRENT_USER.mda;
+    else rec.mda = sheetMDA || rec.mda || '';
     return rec;
   });
+  if (!bulkRows.length){ alert('No candidate rows found under the header. Please fill in at least one row.'); return; }
   document.getElementById('bulk-review-card').style.display='block';
   runBulkValidation();
 });
@@ -1825,32 +1877,28 @@ document.getElementById('bulk-submit').addEventListener('click', async ()=>{
 });
 document.getElementById('bulk-template-link').addEventListener('click', (e)=>{
   e.preventDefault();
-  // A worked sample row so uploaders see the exact expected format for every column.
+  // Exact Lagos CSC template layout: an "MDA:" title line, then S/N + the 18
+  // data columns using the Commission's exact header wording (three columns are
+  // simply "GRADE LEVEL"). Column order is fixed and read back by position.
   const SAMPLE = {
-    'MDA':'Lagos State Public Procurement Agency (PPA)',
-    'Names (Surname First)':'ADELANI OLUWAMIDARE',
-    'CSC File No':'P-49242',
-    'Oracle No':'234576',
-    'Post of 1st Appt':'Fisheries Officer II',
-    'Grade Level (1st Appt)':'08',
-    'Date of 1st Appt':'30-Aug-2021',
-    'Date of Confirmation':'30-Aug-2022',
-    'Present Post/Cadre':'Fisheries Officer I',
-    'Grade Level (Present)':'09',
-    'Date of Present Appt':'30-Aug-2023',
-    'Promotion Post/Cadre':'Senior Fisheries Officer',
-    'Grade Level (Promotion)':'10',
-    'Proposed Notional Date':'01-Jul-2027',
-    'Proposed Financial Date':'01-Jul-2027',
-    'Official Email':'officer1@lagosstate.gov.ng',
-    'Mobile No':'08031234567',
-    'Disability':'NONE',
-    'Remarks':'Sample row — replace or delete before uploading'
+    surname_first:'AKINWANDE Grace Town', csc_file_no:'P35.410', oracle_no:'205458',
+    post_1st_appt:'SENIOR EXECUTIVE', grade_1st:'09', date_1st_appt:'23-Jan-2020', date_confirmation:'23-Jan-2022',
+    present_post:'PRINCIPAL EXECUTIVE', grade_present:'10', date_present_appt:'01-Jul-2023',
+    promotion_post:'PRINCIPAL', grade_promotion:'12', proposed_notional_date:'01-Jul-2026', proposed_financial_date:'01-Jul-2026',
+    official_email:'transparency@lagosstate.gov.ng', mobile_no:'08035698741', disability:'Visually Impaired', remarks:''
   };
-  const headers = FIELDS.map(f=>f.col);
-  const sampleRow = FIELDS.map(f=>SAMPLE[f.col]!==undefined?SAMPLE[f.col]:'');
-  const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
-  ws['!cols'] = headers.map(h=>({wch: Math.max(14, Math.min(28, h.length+3))}));
+  const headerRow = ['S/N'].concat(BULK_TEMPLATE_COLS.map(c=>c.header));
+  const sampleRow = ['1'].concat(BULK_TEMPLATE_COLS.map(c=>SAMPLE[c.key]!==undefined?SAMPLE[c.key]:''));
+  const aoa = [
+    ['MDA:', ''],          // title line — write your MDA name in the cell beside "MDA:"
+    [],                    // spacer row
+    headerRow,
+    sampleRow
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:6}].concat(BULK_TEMPLATE_COLS.map(c=>({wch: Math.max(12, Math.min(30, c.header.length+2))})));
+  // Merge the "MDA:" label area a little so it reads as a title.
+  ws['!merges'] = [{s:{r:0,c:1},e:{r:0,c:5}}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Eligibility List');
   // Second sheet: full cadre/post/grade reference, so bulk uploaders can copy exact titles.
