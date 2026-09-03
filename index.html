@@ -1793,17 +1793,28 @@ document.getElementById('bulk-file').addEventListener('change', async (e)=>{
   if (headerIdx === -1) headerIdx = grid.findIndex(r => r.some(c=>normHeader(c).startsWith('names')));
   if (headerIdx === -1){ alert('Could not find the template header row (the row beginning with "S/N"). Please use the downloaded blank template.'); return; }
 
-  // Read the MDA from a title line above the header, e.g. a cell "MDA:" with the
-  // name beside it, or a line like "MDA: Ministry of Health".
+  // Read the MDA from the title line above the header. Supports several shapes:
+  //  • "MDA:" in one cell with the name in the next cell(s) on the same row
+  //  • "MDA: Ministry of X" all in one cell
+  //  • "MDA:" on its own with the name in the cell directly below it
   let sheetMDA = '';
-  for (let r=0; r<headerIdx; r++){
+  for (let r=0; r<headerIdx && !sheetMDA; r++){
     const row = grid[r].map(cell);
-    const ci = row.findIndex(c => normHeader(c)==='mda' || normHeader(c).startsWith('mda'));
+    const ci = row.findIndex(c => { const n=normHeader(c); return n==='mda' || n.startsWith('mda'); });
     if (ci !== -1){
-      // value beside the label, or text after "MDA:" in the same cell
-      let after = row.slice(ci+1).find(c=>c) || '';
-      if (!after){ const m = row[ci].match(/mda\s*:?\s*(.+)/i); if (m && m[1].trim()) after = m[1].trim(); }
-      if (after){ sheetMDA = after; break; }
+      // (a) text after the colon in the same cell — must be a real name, not just ":"
+      const m = row[ci].match(/mda\s*:\s*(\S.*)$/i);
+      if (m && m[1].trim() && m[1].trim()!==':') sheetMDA = m[1].trim();
+      // (b) a non-empty cell to the right on the same row (skipping stray ":" cells)
+      if (!sheetMDA){
+        const after = row.slice(ci+1).map(cell).find(c=>c && c!==':' );
+        if (after) sheetMDA = after;
+      }
+      // (c) a non-empty cell directly below the label
+      if (!sheetMDA && grid[r+1]){
+        const below = cell(grid[r+1][ci]);
+        if (below && below!==':') sheetMDA = below;
+      }
     }
   }
 
@@ -1817,12 +1828,19 @@ document.getElementById('bulk-file').addEventListener('change', async (e)=>{
       const v = row[idx+1]; // +1 to skip the S/N column
       rec[colspec.key] = (v instanceof Date) ? v : cell(v);
     });
-    // MDA: locked to the signed-in user's MDA for non-admins; else from the title line.
-    if (CURRENT_USER && !isAdminRole()) rec.mda = CURRENT_USER.mda;
-    else rec.mda = sheetMDA || rec.mda || '';
+    // MDA is never a data column in this template. For non-admins it is their
+    // own assigned MDA; for admins it comes from the title line.
+    rec.mda = (CURRENT_USER && !isAdminRole()) ? CURRENT_USER.mda : sheetMDA;
     return rec;
   });
   if (!bulkRows.length){ alert('No candidate rows found under the header. Please fill in at least one row.'); return; }
+  // If an admin uploaded without an MDA in the title line, ask for it up front
+  // rather than flagging every row.
+  if (CURRENT_USER && isAdminRole() && !sheetMDA){
+    const typed = prompt('No MDA was found on the "MDA:" title line of the file.\nEnter the Department/Ministry (MDA) for every row in this upload:', '');
+    if (typed && typed.trim()){ sheetMDA = typed.trim(); bulkRows.forEach(r=>r.mda=sheetMDA); }
+  }
+  window.BULK_SHEET_MDA = sheetMDA; // remembered so re-validation keeps it
   document.getElementById('bulk-review-card').style.display='block';
   runBulkValidation();
 });
@@ -1846,15 +1864,20 @@ function runBulkValidation(){
 }
 function renderBulkTable(){
   const table = document.getElementById('bulk-table');
-  table.querySelector('thead').innerHTML = '<tr><th>Row</th>'+FIELDS.map(f=>`<th>${f.label}</th>`).join('')+'<th></th></tr>';
+  // MDA is not a per-row data column in this template — it is auto-assigned
+  // (from the officer's account, or the file's "MDA:" title line). Show all the
+  // real data columns; render MDA read-only so it can't be mistaken for input.
+  const cols = FIELDS;
+  table.querySelector('thead').innerHTML = '<tr><th>Row</th>'+cols.map(f=>`<th>${f.label}${f.key==='mda'?' (auto)':''}</th>`).join('')+'<th></th></tr>';
   table.querySelector('tbody').innerHTML = bulkRows.map((r,ri)=>{
     const hasErr = Object.keys(r._errors||{}).length>0;
-    const cells = FIELDS.map(f=>{
+    const cells = cols.map(f=>{
       const isErr = r._errors && r._errors[f.key];
-      const locked = f.key==='mda' && CURRENT_USER && !isAdminRole();
+      // MDA is always read-only in bulk (auto-assigned); everything else editable.
+      const locked = (f.key==='mda');
       const editable = locked ? 'false' : 'true';
       const title = isErr ? ` title="${escapeHtml(r._errors[f.key])}"` : '';
-      return `<td contenteditable="${editable}" data-ri="${ri}" data-key="${f.key}" class="${isErr?'cell-err':'cell-ok'}"${title}>${escapeHtml(r[f.key]||'')}</td>`;
+      return `<td contenteditable="${editable}" data-ri="${ri}" data-key="${f.key}" class="${isErr?'cell-err':'cell-ok'}${locked?' cell-locked':''}"${title}>${escapeHtml(r[f.key]||'')}</td>`;
     }).join('');
     return `<tr class="${hasErr?'row-err':'row-ok'}"><td>${r._rowNum}</td>${cells}<td><button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="removeBulkRow(${ri})">✕</button></td></tr>`;
   }).join('');
