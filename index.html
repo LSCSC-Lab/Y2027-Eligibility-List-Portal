@@ -415,6 +415,13 @@
         <span id="bulk-stamp" class="stamp">✕ Errors Found</span>
       </div>
       <p class="hint">Cells shaded red failed a rule — click into any cell to edit, then press <b>Re-check Dataset</b>. Remove a row entirely with its ✕ button. The whole batch is blocked from submission until every row passes.</p>
+      <div id="bulk-admin-mda" style="display:none;margin:6px 0 12px;padding:10px 12px;border:1px solid var(--gold);border-radius:6px;background:#FBF7EE;">
+        <label style="display:block;font-weight:700;color:var(--navy);margin-bottom:5px;">Department/Ministry (MDA) for this upload</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="bulk-mda-select" style="min-width:280px;"></select>
+          <span class="hint" style="margin:0;">Applies to every row in this file.</span>
+        </div>
+      </div>
       <div id="bulk-errlist-wrap">
         <div class="msgbox err show" style="max-height:160px;overflow:auto;">
           <ul class="errlist" id="bulk-errlist"></ul>
@@ -1834,14 +1841,24 @@ document.getElementById('bulk-file').addEventListener('change', async (e)=>{
     return rec;
   });
   if (!bulkRows.length){ alert('No candidate rows found under the header. Please fill in at least one row.'); return; }
-  // If an admin uploaded without an MDA in the title line, ask for it up front
-  // rather than flagging every row.
-  if (CURRENT_USER && isAdminRole() && !sheetMDA){
-    const typed = prompt('No MDA was found on the "MDA:" title line of the file.\nEnter the Department/Ministry (MDA) for every row in this upload:', '');
-    if (typed && typed.trim()){ sheetMDA = typed.trim(); bulkRows.forEach(r=>r.mda=sheetMDA); }
-  }
   window.BULK_SHEET_MDA = sheetMDA; // remembered so re-validation keeps it
   document.getElementById('bulk-review-card').style.display='block';
+  // Admins choose the MDA for the whole upload from a picker in the review panel.
+  const adminMdaWrap = document.getElementById('bulk-admin-mda');
+  if (CURRENT_USER && isAdminRole()){
+    adminMdaWrap.style.display='';
+    const sel = document.getElementById('bulk-mda-select');
+    sel.innerHTML = mdaOptionsHTML(isKnownMDA(sheetMDA) ? sheetMDA : '');
+    // If the file's title-line MDA isn't in the official list, still offer it.
+    if (sheetMDA && !isKnownMDA(sheetMDA)) ensureMDAOption(sel, sheetMDA);
+    sel.value = sheetMDA || '';
+    // Apply the chosen MDA to every row and re-validate.
+    sel.onchange = ()=>{ const v=sel.value; bulkRows.forEach(r=>r.mda=v); window.BULK_SHEET_MDA=v; runBulkValidation(); };
+    // Apply whatever is currently selected so rows start with it.
+    if (sel.value){ bulkRows.forEach(r=>r.mda=sel.value); }
+  } else {
+    adminMdaWrap.style.display='none';
+  }
   runBulkValidation();
 });
 
@@ -1907,7 +1924,7 @@ document.getElementById('bulk-template-link').addEventListener('click', (e)=>{
     surname_first:'AKINWANDE Grace Town', csc_file_no:'P35,410', oracle_no:'205458',
     post_1st_appt:'SENIOR EXECUTIVE', grade_1st:'09', date_1st_appt:'23-Jan-2020', date_confirmation:'23-Jan-2022',
     present_post:'PRINCIPAL EXECUTIVE', grade_present:'10', date_present_appt:'01-Jul-2023',
-    promotion_post:'PRINCIPAL', grade_promotion:'12', proposed_notional_date:'01-Jul-2026', proposed_financial_date:'01-Jul-2026',
+    promotion_post:'PRINCIPAL', grade_promotion:'12', proposed_notional_date:'01-Jul-2027', proposed_financial_date:'01-Jul-2027',
     official_email:'transparency@lagosstate.gov.ng', mobile_no:'08035698741', disability:'Visually Impaired', remarks:''
   };
   const headerRow = ['S/N'].concat(BULK_TEMPLATE_COLS.map(c=>c.header));
