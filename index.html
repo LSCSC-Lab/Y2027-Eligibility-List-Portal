@@ -90,7 +90,7 @@
   .photo-frame{width:118px;height:142px;border:2px solid var(--navy);border-radius:4px;background:#F6F5F1;
     display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;transition:box-shadow .15s ease;}
   .photo-frame:hover{box-shadow:0 3px 10px rgba(15,44,76,.2);}
-  .photo-frame img{width:100%;height:100%;object-fit:cover;}
+  .photo-frame img{width:100%;height:100%;object-fit:contain;background:#fff;}
   .photo-frame .ph{font-size:11px;color:var(--muted,#5B6572);line-height:1.4;padding:6px;font-family:var(--sans);}
   .photo-cap{font-size:10.5px;color:var(--muted,#5B6572);margin-top:5px;font-family:var(--sans);line-height:1.3;}
   .photo-cap .req-star{color:var(--err);}
@@ -138,6 +138,24 @@
   td.cell-err{background:var(--err-bg);outline:1px solid var(--err);}
   td.cell-ok{background:#fff;}
   tr.row-err td:first-child{border-left:3px solid var(--err);}
+  /* Bright-red pinpointing of errors in generated/submitted data */
+  td.cell-baderr{background:#FF3B30 !important;color:#fff !important;font-weight:700;outline:2px solid #B3261E;}
+  tr.row-has-err{background:#FFF0EF;}
+  .err-col{min-width:220px;}
+  ul.err-list{margin:0;padding-left:16px;color:#B3261E;font-size:12px;}
+  ul.err-list li{margin:2px 0;}
+  .ok-badge{color:#1E7145;font-weight:700;font-size:12px;}
+  .err-banner{background:#FFEBE9;border:1px solid #FF3B30;color:#B3261E;font-weight:700;padding:10px 14px;border-radius:6px;margin:10px 0;}
+  .report-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:8px;}
+  .report-card{border:1px solid var(--paper-line);border-radius:8px;padding:16px;background:#fff;}
+  .report-card h3{margin:0 0 8px;color:var(--navy);font-family:var(--serif);font-size:16px;}
+  .report-card p{font-size:13px;color:var(--ink-soft,#5B6572);margin:0 0 12px;}
+  .rpt{font-family:Georgia,serif;color:#1B2430;}
+  .rpt h1{color:#0F2C4C;font-size:20px;text-align:center;margin:0 0 4px;}
+  .rpt h2{color:#0F2C4C;font-size:15px;border-left:3px solid #B9892E;padding-left:8px;margin:16px 0 8px;}
+  .rpt table{width:100%;border-collapse:collapse;margin:8px 0;}
+  .rpt th{background:#0F2C4C;color:#fff;font-size:12px;padding:6px 9px;text-align:left;}
+  .rpt td{border:1px solid #C9CFD8;font-size:12px;padding:5px 9px;}
   tr.row-ok td:first-child{border-left:3px solid var(--ok);}
 
   .stamp{display:inline-flex;align-items:center;gap:8px;border:2px solid var(--err);color:var(--err);font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:1.5px;padding:6px 12px;border-radius:4px;transform:rotate(-2deg);text-transform:uppercase;}
@@ -204,6 +222,7 @@
     <button class="tabbtn" data-tab="single" id="tab-single" hidden>Single Entry</button>
     <button class="tabbtn" data-tab="bulk" id="tab-bulk" hidden>Bulk Upload</button>
     <button class="tabbtn" data-tab="review" id="tab-review" hidden>Form A Review</button>
+    <button class="tabbtn" data-tab="reports" id="tab-reports" hidden>Reports</button>
     <button class="tabbtn" data-tab="admin" id="tab-admin" hidden>Admin Dashboard</button>
   </nav>
 </header>
@@ -242,7 +261,7 @@
         </div>
         <div class="photo-cap">Passport photograph <span class="req-star">*</span></div>
         <div class="photo-actions"><button class="btn btn-ghost" id="photo-remove" style="display:none;">Remove</button></div>
-        <input type="file" id="photo-input" accept="image/png,image/jpeg" style="display:none;">
+        <input type="file" id="photo-input" accept="image/*" style="display:none;">
       </div>
       <div style="text-align:center;border-bottom:2px solid var(--gold);padding-bottom:14px;margin-bottom:6px;">
         <div style="font-family:var(--serif);font-weight:700;color:var(--navy);font-size:16px;line-height:1.5;">
@@ -470,6 +489,7 @@
         </div>
       </div>
       <p class="hint">Only the super administrator can edit or delete a record once it has been submitted.</p>
+      <div id="admin-err-banner" class="err-banner" style="display:none;"></div>
       <div class="tablewrap"><table id="admin-table"><thead></thead><tbody></tbody></table></div>
     </div>
 
@@ -486,10 +506,69 @@
         <div><canvas id="chartA"></canvas></div>
         <div><canvas id="chartB"></canvas></div>
       </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--paper-line);">
+        <button class="btn btn-primary" id="copy-analysis-link">Copy shareable analysis link</button>
+        <span class="hint" id="analysis-link-msg" style="margin-left:8px;"></span>
+        <p class="hint" style="margin-top:8px;">This link opens a read-only, live analysis dashboard (aggregate counts only — no personal data). Anyone with the link can view it without signing in.</p>
+      </div>
     </div>
   </section>
 
-  <!-- =================== FORM A REVIEW =================== -->
+  <!-- =================== PUBLIC ANALYSIS (shareable link ?view=analysis) =================== -->
+  <section class="panel" id="panel-analysis">
+    <div class="card">
+      <h2><span class="idx">📊</span>Y2027 Promotion Exercise — Live Analysis</h2>
+      <p class="hint">Read-only aggregate analysis of submitted eligibility records. Figures update live as records are submitted.</p>
+      <div id="analysis-kpis" class="kpi-row" style="margin:12px 0;"></div>
+      <div id="analysis-msg" class="msgbox"></div>
+      <div class="chartgrid">
+        <div><canvas id="pubChartA"></canvas></div>
+        <div><canvas id="pubChartB"></canvas></div>
+      </div>
+      <div class="chartgrid" style="margin-top:14px;">
+        <div><canvas id="pubChartC"></canvas></div>
+        <div><canvas id="pubChartD"></canvas></div>
+      </div>
+      <p class="footnote" style="margin-top:20px;">Y2027 Promotion Exercise Eligibility List Portal · Lagos State Civil Service Commission</p>
+    </div>
+  </section>
+
+  <!-- =================== REPORTS =================== -->
+  <section class="panel" id="panel-reports">
+    <div class="card">
+      <h2><span class="idx">📄</span>Reports</h2>
+      <p class="hint">Generate promotion-exercise reports from the current submitted data. Each report can be previewed, then downloaded as a Word document. Figures are computed live from the records in the system.</p>
+      <div id="reports-msg" class="msgbox"></div>
+      <div class="report-cards">
+        <div class="report-card">
+          <h3>1 · Overall Summary Report</h3>
+          <p>Cycle summary (January vs July notional) and a breakdown by promotion grade level, with recommended totals.</p>
+          <div class="btnbar">
+            <button class="btn btn-primary" onclick="generateReport('summary')">Generate &amp; Download</button>
+            <button class="btn btn-ghost" onclick="previewReport('summary')">Preview</button>
+          </div>
+        </div>
+        <div class="report-card">
+          <h3>2 · Promotion Defence Report (by MDA)</h3>
+          <p>Per-MDA listing of total officers presented, grouped and totalled, in the promotion-defence layout.</p>
+          <div class="btnbar">
+            <button class="btn btn-primary" onclick="generateReport('defence')">Generate &amp; Download</button>
+            <button class="btn btn-ghost" onclick="previewReport('defence')">Preview</button>
+          </div>
+        </div>
+        <div class="report-card">
+          <h3>3 · Promotion Exercise Report (RSTP narrative)</h3>
+          <p>Narrative report with an overall criteria-met summary and a grade-bracket performance table (GL06–10 / GL12–16).</p>
+          <div class="btnbar">
+            <button class="btn btn-primary" onclick="generateReport('rstp')">Generate &amp; Download</button>
+            <button class="btn btn-ghost" onclick="previewReport('rstp')">Preview</button>
+          </div>
+        </div>
+      </div>
+      <div id="report-preview" style="display:none;margin-top:18px;border:1px solid var(--paper-line);border-radius:6px;padding:18px;background:#fff;"></div>
+    </div>
+  </section>
+
   <section class="panel" id="panel-review">
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -546,7 +625,7 @@
 /* =========================================================================
    CONFIG
    ========================================================================= */
-const DEFAULT_SCRIPT_URL = ""; // hardcode your deployed Apps Script Web App URL here for a permanent build
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKTcVbT3zHq4TeCmRHWjl9aPn6xxqH5SNrfXEjvt7Yw9yAAbitMpBqR5p0UWSemitk/exec"; // hardcode your deployed Apps Script Web App URL here for a permanent build
 // Resolve the backend URL: prefer the hardcoded one, else a URL saved by a
 // previous one-time setup on this browser.
 let SAVED_SCRIPT_URL = "";
@@ -625,7 +704,8 @@ function stateOptionsHTML(){ return '<option value="">Select state…</option>' 
 // Build option markup for the MDA <select>. `selected` pre-selects a value.
 function mdaOptionsHTML(selected){
   let html = '<option value="">Select MDA…</option>';
-  LAGOS_MDA_LIST.forEach(n=>{
+  const sorted = LAGOS_MDA_LIST.slice().sort((a,b)=>a.localeCompare(b));
+  sorted.forEach(n=>{
     const sel = (n===selected) ? ' selected' : '';
     html += `<option value="${escapeHtml(n)}"${sel}>${escapeHtml(n)}</option>`;
   });
@@ -848,8 +928,7 @@ function parseFlexibleDate(v){
 }
 function fmtDate(d){
   if (!d) return '';
-  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${String(d.getUTCDate()).padStart(2,'0')}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+  return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
 }
 function normalizeGrade(v){
   if (v===null||v===undefined) return '';
@@ -859,13 +938,19 @@ function normalizeGrade(v){
   if (isNaN(n)) return '';
   return String(n).padStart(2,'0');
 }
-// Format a cell for display: grade-level fields are zero-padded (2 -> 02) so
-// GL02–GL09 always show a leading zero. Other fields display unchanged.
+// Format a cell for display: grade-level fields are zero-padded (2 -> 02); date
+// fields are shown as DD/MM/YYYY with any trailing time (e.g. "00:00") removed.
+// Other fields display unchanged.
 const GRADE_FIELD_KEYS = ['grade_1st','grade_present','grade_promotion'];
+const DATE_FIELD_KEYS = ['date_1st_appt','date_confirmation','date_present_appt','proposed_notional_date','proposed_financial_date'];
 function displayCell(key, val){
   if (GRADE_FIELD_KEYS.indexOf(key)!==-1 && val!=='' && val!=null){
     const p = normalizeGrade(val);
     return p || String(val);
+  }
+  if (DATE_FIELD_KEYS.indexOf(key)!==-1 && val!=='' && val!=null){
+    const d = parseFlexibleDate(String(val).replace(/\s+\d{1,2}:\d{2}(:\d{2})?$/,'')); // strip any trailing time
+    return d ? fmtDate(d) : String(val);
   }
   return val==null?'':val;
 }
@@ -992,6 +1077,7 @@ document.getElementById('tabbar').addEventListener('click', e=>{
   showPanel(btn.dataset.tab);
   if (btn.dataset.tab==='admin') loadAdminData();
   if (btn.dataset.tab==='review') loadReviewData();
+  if (btn.dataset.tab==='reports') loadReportsData();
 });
 
 /* =========================================================================
@@ -1003,6 +1089,7 @@ function updateAuthUI(){
   document.getElementById('tab-single').hidden = !loggedIn;
   document.getElementById('tab-bulk').hidden = !loggedIn;
   document.getElementById('tab-review').hidden = !loggedIn;
+  document.getElementById('tab-reports').hidden = !(loggedIn && admin);
   document.getElementById('tab-admin').hidden = !(loggedIn && admin);
   document.getElementById('tab-login').hidden = loggedIn;
 
@@ -1108,8 +1195,8 @@ document.getElementById('goto-reset-code').addEventListener('click', ()=>showPan
     fileInput.addEventListener('change', ()=>{
       const file = fileInput.files && fileInput.files[0];
       if (!file) return;
-      if (!/^image\/(png|jpe?g)$/.test(file.type)){ showMsg('brief-msg','err','Photograph must be a PNG or JPG image.'); return; }
-      if (file.size > 8*1024*1024){ showMsg('brief-msg','err','Photograph is too large (max 8 MB). Please choose a smaller image.'); return; }
+      if (!/^image\//.test(file.type)){ showMsg('brief-msg','err','Please choose an image file (any picture format).'); return; }
+      if (file.size > 15*1024*1024){ showMsg('brief-msg','err','Photograph is too large (max 15 MB). Please choose a smaller image.'); return; }
       resizePhoto(file, dataUrl=>{
         BRIEF_PHOTO = dataUrl;
         frame.innerHTML = `<img src="${dataUrl}" alt="Candidate photograph">`;
@@ -2027,6 +2114,121 @@ async function loadAdminData(){
   loadUsers();
 }
 document.getElementById('admin-refresh').addEventListener('click', loadAdminData);
+
+/* =========================================================================
+   REPORTS — auto-filled from live submitted data
+   ========================================================================= */
+let reportRecords = [];
+async function loadReportsData(){
+  if (!CURRENT_USER || !isAdminRole()) return;
+  showMsg('reports-msg','warn','Loading data for reports…');
+  try{
+    const res = await callScript({action:'getAllRecords', token:AUTH_TOKEN});
+    if (res.success){ reportRecords = res.records||[]; document.getElementById('reports-msg').className='msgbox'; }
+    else showMsg('reports-msg','err','Could not load data: '+(res.message||'unknown'));
+  }catch(err){ showMsg('reports-msg','err','Could not load data: '+err.message); }
+}
+// Compute all the figures the three reports need, from the loaded records.
+function computeReportStats(){
+  const recs = reportRecords;
+  const total = recs.length;
+  const notional = {jan:0, jul:0, other:0};
+  const byGrade = {};      // promotion grade -> count
+  const byMda = {};        // mda -> count
+  const bracket = {low:0, high:0, other:0}; // GL06-10, GL12-16
+  recs.forEach(r=>{
+    const d = parseFlexibleDate(r.proposed_notional_date);
+    const m = d? d.getUTCMonth() : -1;
+    if (m===0) notional.jan++; else if (m===6) notional.jul++; else notional.other++;
+    const g = normalizeGrade(r.grade_promotion);
+    if (g) byGrade[g] = (byGrade[g]||0)+1;
+    const gi = parseInt(g,10);
+    if (!isNaN(gi)){ if(gi>=6&&gi<=10) bracket.low++; else if(gi>=12&&gi<=16) bracket.high++; else bracket.other++; } else bracket.other++;
+    const mda = (r.mda||'(Unspecified)').trim();
+    byMda[mda] = (byMda[mda]||0)+1;
+  });
+  return {total, notional, byGrade, byMda, bracket};
+}
+function buildReportHTML(type){
+  const s = computeReportStats();
+  const today = fmtDate(new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())));
+  const header = `<div class="rpt"><div style="text-align:center;margin-bottom:10px;">
+    <div style="font-weight:700;color:#0F2C4C;">LAGOS STATE GOVERNMENT · CIVIL SERVICE COMMISSION</div>
+    <div style="font-weight:700;color:#0F2C4C;">YEAR 2027 PROMOTION EXERCISE</div></div>`;
+  if (type==='summary'){
+    const gl = Object.keys(s.byGrade).sort();
+    const gradeRows = gl.map(g=>`<tr><td>GL${g}</td><td>${s.byGrade[g]}</td></tr>`).join('') || '<tr><td colspan="2">No records</td></tr>';
+    return header + `<h1>Overall Summary Report</h1>
+      <p style="text-align:center;font-size:12px;">Generated ${today}</p>
+      <h2>1. Notional Date Summary</h2>
+      <table><tr><th>Cycle</th><th>Officers</th></tr>
+        <tr><td>January (01/01/2027)</td><td>${s.notional.jan}</td></tr>
+        <tr><td>July (01/07/2027)</td><td>${s.notional.jul}</td></tr>
+        ${s.notional.other?`<tr><td>Other / unrecognised</td><td>${s.notional.other}</td></tr>`:''}
+        <tr><th>GRAND TOTAL</th><th>${s.total}</th></tr></table>
+      <h2>2. By Promotion Grade Level</h2>
+      <table><tr><th>Grade Level</th><th>No. of Officers</th></tr>${gradeRows}
+        <tr><th>TOTAL</th><th>${s.total}</th></tr></table>
+      <h2>3. By Promotion Bracket</h2>
+      <table><tr><th>Bracket</th><th>Officers</th></tr>
+        <tr><td>GL06 – GL10</td><td>${s.bracket.low}</td></tr>
+        <tr><td>GL12 – GL16</td><td>${s.bracket.high}</td></tr>
+        ${s.bracket.other?`<tr><td>Outside brackets</td><td>${s.bracket.other}</td></tr>`:''}</table>
+      </div>`;
+  }
+  if (type==='defence'){
+    const mdas = Object.keys(s.byMda).sort();
+    const rows = mdas.map((m,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(m)}</td><td>${s.byMda[m]}</td></tr>`).join('') || '<tr><td colspan="3">No records</td></tr>';
+    return header + `<h1>Promotion Defence Report</h1>
+      <p style="text-align:center;font-size:12px;">Generated ${today}</p>
+      <h2>Officers Presented by MDA</h2>
+      <table><tr><th>S/N</th><th>Department/Ministry (MDA)</th><th>Total No. of Officers Presented</th></tr>
+        ${rows}
+        <tr><th colspan="2">GRAND TOTAL</th><th>${s.total}</th></tr></table>
+      <p style="font-size:12px;margin-top:10px;">This report lists the total number of officers presented by each MDA in the Year 2027 Promotion Exercise, generated from records submitted to the portal.</p>
+      </div>`;
+  }
+  if (type==='rstp'){
+    const low = s.bracket.low, high = s.bracket.high;
+    const pct = n => s.total? Math.round((n/s.total)*1000)/10 : 0;
+    return header + `<h1>Report on Year 2027 Promotion Exercise</h1>
+      <p style="text-align:center;font-size:12px;">Generated ${today}</p>
+      <h2>1. Overview</h2>
+      <p style="font-size:12px;">This report provides an overview of the Year 2027 Promotion Exercise for the Lagos State Civil Service Commission, summarising eligible officers submitted through the portal across grade levels GL06–GL16.</p>
+      <h2>2. Overall Summary</h2>
+      <table><tr><th>Criteria</th><th>Total</th></tr>
+        <tr><td>Total officers submitted</td><td>${s.total}</td></tr>
+        <tr><td>January notional</td><td>${s.notional.jan}</td></tr>
+        <tr><td>July notional</td><td>${s.notional.jul}</td></tr></table>
+      <h2>3. By Grade Bracket</h2>
+      <table><tr><th>Grade Bracket</th><th>No. of Officers</th><th>% of Total</th></tr>
+        <tr><td>GL06 – GL10</td><td>${low}</td><td>${pct(low)}%</td></tr>
+        <tr><td>GL12 – GL16</td><td>${high}</td><td>${pct(high)}%</td></tr></table>
+      <p style="font-size:12px;margin-top:12px;">Submitted please,<br><br>_______________________<br>For: Civil Service Commission</p>
+      </div>`;
+  }
+  return header + '<p>Unknown report.</p></div>';
+}
+const REPORT_TITLES = { summary:'Overall_Summary_Report', defence:'Promotion_Defence_Report', rstp:'Promotion_Exercise_Report' };
+function previewReport(type){
+  if (!reportRecords.length){ showMsg('reports-msg','warn','No submitted records loaded yet. Try Refresh, or ensure records exist.'); }
+  const el = document.getElementById('report-preview');
+  el.innerHTML = buildReportHTML(type);
+  el.style.display='';
+  el.scrollIntoView({block:'start'});
+}
+function generateReport(type){
+  const inner = buildReportHTML(type);
+  const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${REPORT_TITLES[type]}</title>
+    <style>body{font-family:Georgia,serif;color:#1B2430;max-width:800px;margin:20px auto;padding:0 20px;}
+    h1{color:#0F2C4C;font-size:20px;text-align:center;} h2{color:#0F2C4C;font-size:15px;border-left:3px solid #B9892E;padding-left:8px;}
+    table{width:100%;border-collapse:collapse;margin:8px 0;} th{background:#0F2C4C;color:#fff;font-size:12px;padding:6px 9px;text-align:left;}
+    td{border:1px solid #C9CFD8;font-size:12px;padding:5px 9px;}</style></head><body>${inner}</body></html>`;
+  const blob = new Blob([doc], {type:'application/msword'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=REPORT_TITLES[type]+'.doc';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  showMsg('reports-msg','ok','Report generated and downloaded.');
+}
 function populateMdaFilter(){
   const sel = document.getElementById('admin-mda-filter');
   const mdas = Array.from(new Set(adminData.map(r=>r.mda).filter(Boolean))).sort();
@@ -2041,17 +2243,39 @@ function renderAdminTable(){
   const rows = currentFilteredData();
   const table = document.getElementById('admin-table');
   table.querySelector('thead')?.remove();
-  const theadHtml = '<thead><tr><th>Submitted</th><th>By</th>'+FIELDS.map(f=>`<th>${f.label}</th>`).join('')+'<th>Actions</th></tr></thead>';
+  const theadHtml = '<thead><tr><th>Submitted</th><th>By</th>'+FIELDS.map(f=>`<th>${f.label}</th>`).join('')+'<th class="err-col">Errors</th><th>Actions</th></tr></thead>';
   table.innerHTML = theadHtml + '<tbody></tbody>';
-  table.querySelector('tbody').innerHTML = rows.map(r=>`
-    <tr data-id="${r.id}">
+  let errorRowCount = 0;
+  table.querySelector('tbody').innerHTML = rows.map(r=>{
+    // Re-validate each submitted record so any bad data is pinpointed in bright red.
+    const {errors} = validateRecord(r);
+    const errKeys = Object.keys(errors);
+    if (errKeys.length) errorRowCount++;
+    const cells = FIELDS.map(f=>{
+      const bad = errors[f.key];
+      const cls = bad ? 'cell-baderr' : '';
+      const tip = bad ? ` title="${escapeHtml(bad)}"` : '';
+      return `<td data-key="${f.key}" class="${cls}"${tip}>${escapeHtml(displayCell(f.key, r[f.key]||''))}</td>`;
+    }).join('');
+    const errList = errKeys.length
+      ? `<ul class="err-list">${errKeys.map(k=>{ const f=FIELDS.find(x=>x.key===k); return `<li>${escapeHtml((f?f.label:k)+': '+errors[k])}</li>`; }).join('')}</ul>`
+      : '<span class="ok-badge">✓ OK</span>';
+    return `<tr data-id="${r.id}" class="${errKeys.length?'row-has-err':''}">
       <td>${escapeHtml(r.timestamp||'')}</td><td>${escapeHtml(r.submitted_by||'')}</td>
-      ${FIELDS.map(f=>`<td data-key="${f.key}">${escapeHtml(displayCell(f.key, r[f.key]||''))}</td>`).join('')}
+      ${cells}
+      <td class="err-col">${errList}</td>
       <td class="action-btns">
         <button class="btn btn-ghost" onclick="editRecordRow('${r.id}')">Edit</button>
         <button class="btn btn-danger" onclick="deleteRecordRow('${r.id}')">Delete</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+  // Banner summarising how many records need correction.
+  const banner = document.getElementById('admin-err-banner');
+  if (banner){
+    if (errorRowCount){ banner.style.display=''; banner.textContent = `⚠ ${errorRowCount} record(s) have errors highlighted in red below — see the Errors column for details.`; }
+    else { banner.style.display='none'; }
+  }
 }
 function editRecordRow(id){
   const tr = document.querySelector(`#admin-table tr[data-id="${id}"]`); if (!tr) return;
@@ -2168,6 +2392,13 @@ document.getElementById('chart-bracket').addEventListener('click', ()=>{
    ========================================================================= */
 (function initView(){
   const params = new URLSearchParams(window.location.search);
+  // Shareable analysis-only view: no login, aggregate data only.
+  if (params.get('view')==='analysis'){
+    document.getElementById('tabbar').style.display='none';
+    loadPublicAnalysis();
+    showPanel('analysis');
+    return;
+  }
   // Populate the admin "Create Account" MDA picker once.
   const nuMda = document.getElementById('nu-mda');
   if (nuMda) nuMda.innerHTML = mdaOptionsHTML('');
@@ -2176,6 +2407,48 @@ document.getElementById('chart-bracket').addEventListener('click', ()=>{
   else if (!isConfigured()) showPanel('settings');   // one-time setup, only when no backend URL yet
   else showPanel('login');
 })();
+
+// ---- Public (shareable) analysis dashboard ----
+let pubCharts = {};
+async function loadPublicAnalysis(){
+  showMsg('analysis-msg','warn','Loading live analysis…');
+  try{
+    const res = await callScript({action:'getAnalytics'});
+    if (!res || !res.success){ showMsg('analysis-msg','err','Could not load analysis.'); return; }
+    renderPublicAnalysis(res);
+    document.getElementById('analysis-msg').className='msgbox';
+  }catch(err){ showMsg('analysis-msg','err','Could not load analysis: '+err.message); }
+}
+function renderPublicAnalysis(a){
+  // KPI tiles
+  const janPct = a.total? Math.round((a.notional.jan/a.total)*100):0;
+  const kpis = [
+    {n:a.total, l:'Total Records'},
+    {n:Object.keys(a.byMda).length, l:'MDAs Represented'},
+    {n:a.notional.jan, l:'January Notional'},
+    {n:a.notional.jul, l:'July Notional'},
+  ];
+  document.getElementById('analysis-kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="n">${k.n}</div><div class="l">${k.l}</div></div>`).join('');
+  const mk = (canvasId, key, config)=>{ if(pubCharts[key]) pubCharts[key].destroy(); pubCharts[key]=new Chart(document.getElementById(canvasId), config); };
+  // A: Notional Jan/Jul
+  mk('pubChartA','A',{type:'bar', data:{labels:['January','July'].concat(a.notional.other?['Other']:[]), datasets:[{label:'Officers', data:[a.notional.jan,a.notional.jul].concat(a.notional.other?[a.notional.other]:[]), backgroundColor:['#0F2C4C','#B9892E','#9AA3AD']}]}, options:{plugins:{title:{display:true,text:`Notional Date — Jan: ${a.notional.jan}, Jul: ${a.notional.jul}`},legend:{display:false}}}});
+  // B: Promotion bracket
+  mk('pubChartB','B',{type:'bar', data:{labels:['GL06–10','GL12–16'].concat(a.bracket.other?['Outside']:[]), datasets:[{label:'Officers', data:[a.bracket.low,a.bracket.high].concat(a.bracket.other?[a.bracket.other]:[]), backgroundColor:['#1E7145','#0F2C4C','#9AA3AD']}]}, options:{plugins:{title:{display:true,text:`Promotion Bracket — GL06–10: ${a.bracket.low}, GL12–16: ${a.bracket.high}`},legend:{display:false}}}});
+  // C: By promotion grade
+  const gl = Object.keys(a.byPromotionGrade).sort();
+  mk('pubChartC','C',{type:'bar', data:{labels:gl.map(g=>'GL'+g), datasets:[{label:'Officers', data:gl.map(g=>a.byPromotionGrade[g]), backgroundColor:'#0F2C4C'}]}, options:{plugins:{title:{display:true,text:'By Promotion Grade Level'},legend:{display:false}}}});
+  // D: By MDA (top values)
+  const mdas = Object.keys(a.byMda).sort((x,y)=>a.byMda[y]-a.byMda[x]);
+  mk('pubChartD','D',{type:'bar', data:{labels:mdas, datasets:[{label:'Records', data:mdas.map(m=>a.byMda[m]), backgroundColor:'#B9892E'}]}, options:{indexAxis:'y', plugins:{title:{display:true,text:'Records by MDA'},legend:{display:false}}}});
+}
+
+// Copy shareable analysis link (admin panel).
+document.getElementById('copy-analysis-link')?.addEventListener('click', ()=>{
+  const link = location.origin + location.pathname + '?view=analysis';
+  const done = ()=>{ const m=document.getElementById('analysis-link-msg'); m.textContent='Link copied ✓ — '+link; };
+  if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(done).catch(()=>{ prompt('Copy this analysis link:', link); }); }
+  else prompt('Copy this analysis link:', link);
+});
 </script>
 </body>
 </html>
