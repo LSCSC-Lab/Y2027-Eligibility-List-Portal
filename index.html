@@ -479,8 +479,8 @@
       <div class="btnbar" style="margin-bottom:16px;">
         <button class="btn btn-ghost" id="chart-grade">Grade Level Distribution</button>
         <button class="btn btn-ghost" id="chart-mda">Records by MDA</button>
-        <button class="btn btn-ghost" id="chart-disability">Disability Inclusion</button>
-        <button class="btn btn-ghost" id="chart-timeline">Submissions Over Time</button>
+        <button class="btn btn-ghost" id="chart-notional">Notional Date (Jan / July)</button>
+        <button class="btn btn-ghost" id="chart-bracket">Promotion Bracket (GL06–10 / GL12–16)</button>
       </div>
       <div class="chartgrid">
         <div><canvas id="chartA"></canvas></div>
@@ -546,7 +546,7 @@
 /* =========================================================================
    CONFIG
    ========================================================================= */
-const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKTcVbT3zHq4TeCmRHWjl9aPn6xxqH5SNrfXEjvt7Yw9yAAbitMpBqR5p0UWSemitk/exec"; // hardcode your deployed Apps Script Web App URL here for a permanent build
+const DEFAULT_SCRIPT_URL = ""; // hardcode your deployed Apps Script Web App URL here for a permanent build
 // Resolve the backend URL: prefer the hardcoded one, else a URL saved by a
 // previous one-time setup on this browser.
 let SAVED_SCRIPT_URL = "";
@@ -858,6 +858,16 @@ function normalizeGrade(v){
   const n = parseInt(s,10);
   if (isNaN(n)) return '';
   return String(n).padStart(2,'0');
+}
+// Format a cell for display: grade-level fields are zero-padded (2 -> 02) so
+// GL02–GL09 always show a leading zero. Other fields display unchanged.
+const GRADE_FIELD_KEYS = ['grade_1st','grade_present','grade_promotion'];
+function displayCell(key, val){
+  if (GRADE_FIELD_KEYS.indexOf(key)!==-1 && val!=='' && val!=null){
+    const p = normalizeGrade(val);
+    return p || String(val);
+  }
+  return val==null?'':val;
 }
 function normalizePhone(v){
   let s = String(v||'').trim().replace(/[\s\-()]/g,'');
@@ -1758,7 +1768,7 @@ function renderQueue(){
   const table = document.getElementById('queue-table');
   table.querySelector('thead').innerHTML = '<tr><th>#</th>'+FIELDS.map(f=>`<th>${f.label}</th>`).join('')+'<th></th></tr>';
   table.querySelector('tbody').innerHTML = queue.map((r,i)=>
-    `<tr><td>${i+1}</td>${FIELDS.map(f=>`<td>${escapeHtml(r[f.key]||'')}</td>`).join('')}<td><button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="removeQueue(${r._qid})">✕</button></td></tr>`
+    `<tr><td>${i+1}</td>${FIELDS.map(f=>`<td>${escapeHtml(displayCell(f.key, r[f.key]||''))}</td>`).join('')}<td><button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="removeQueue(${r._qid})">✕</button></td></tr>`
   ).join('');
   document.getElementById('queue-count').textContent = `${queue.length} record(s) queued`;
   document.getElementById('single-submit-batch').disabled = queue.length===0;
@@ -1894,7 +1904,7 @@ function renderBulkTable(){
       const locked = (f.key==='mda');
       const editable = locked ? 'false' : 'true';
       const title = isErr ? ` title="${escapeHtml(r._errors[f.key])}"` : '';
-      return `<td contenteditable="${editable}" data-ri="${ri}" data-key="${f.key}" class="${isErr?'cell-err':'cell-ok'}${locked?' cell-locked':''}"${title}>${escapeHtml(r[f.key]||'')}</td>`;
+      return `<td contenteditable="${editable}" data-ri="${ri}" data-key="${f.key}" class="${isErr?'cell-err':'cell-ok'}${locked?' cell-locked':''}"${title}>${escapeHtml(displayCell(f.key, r[f.key]||''))}</td>`;
     }).join('');
     return `<tr class="${hasErr?'row-err':'row-ok'}"><td>${r._rowNum}</td>${cells}<td><button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="removeBulkRow(${ri})">✕</button></td></tr>`;
   }).join('');
@@ -2036,7 +2046,7 @@ function renderAdminTable(){
   table.querySelector('tbody').innerHTML = rows.map(r=>`
     <tr data-id="${r.id}">
       <td>${escapeHtml(r.timestamp||'')}</td><td>${escapeHtml(r.submitted_by||'')}</td>
-      ${FIELDS.map(f=>`<td data-key="${f.key}">${escapeHtml(r[f.key]||'')}</td>`).join('')}
+      ${FIELDS.map(f=>`<td data-key="${f.key}">${escapeHtml(displayCell(f.key, r[f.key]||''))}</td>`).join('')}
       <td class="action-btns">
         <button class="btn btn-ghost" onclick="editRecordRow('${r.id}')">Edit</button>
         <button class="btn btn-danger" onclick="deleteRecordRow('${r.id}')">Delete</button>
@@ -2090,13 +2100,13 @@ function renderKpis(){
 }
 document.getElementById('admin-download-xlsx').addEventListener('click', ()=>{
   const rows = currentFilteredData();
-  const ws = XLSX.utils.json_to_sheet(rows.map(r=>{ const o={Timestamp:r.timestamp, 'Submitted By':r.submitted_by}; FIELDS.forEach(f=>o[f.label]=r[f.key]); return o; }));
+  const ws = XLSX.utils.json_to_sheet(rows.map(r=>{ const o={Timestamp:r.timestamp, 'Submitted By':r.submitted_by}; FIELDS.forEach(f=>o[f.label]=displayCell(f.key, r[f.key])); return o; }));
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Eligibility List');
   XLSX.writeFile(wb, 'Y2027_Eligibility_List_All_Records.xlsx');
 });
 document.getElementById('admin-download-csv').addEventListener('click', ()=>{
   const rows = currentFilteredData();
-  const ws = XLSX.utils.json_to_sheet(rows.map(r=>{ const o={Timestamp:r.timestamp, 'Submitted By':r.submitted_by}; FIELDS.forEach(f=>o[f.label]=r[f.key]); return o; }));
+  const ws = XLSX.utils.json_to_sheet(rows.map(r=>{ const o={Timestamp:r.timestamp, 'Submitted By':r.submitted_by}; FIELDS.forEach(f=>o[f.label]=displayCell(f.key, r[f.key])); return o; }));
   const csv = XLSX.utils.sheet_to_csv(ws);
   const blob = new Blob([csv], {type:'text/csv'});
   const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Y2027_Eligibility_List_All_Records.csv'; a.click();
@@ -2111,9 +2121,9 @@ function drawChart(canvasId, config, which){
 }
 document.getElementById('chart-grade').addEventListener('click', ()=>{
   const rows = currentFilteredData(); const counts={};
-  rows.forEach(r=>{ const g=r.grade_promotion||r.grade_present; if(g) counts[g]=(counts[g]||0)+1; });
+  rows.forEach(r=>{ const g=normalizeGrade(r.grade_promotion||r.grade_present); if(g) counts[g]=(counts[g]||0)+1; });
   const labels = Object.keys(counts).sort();
-  drawChart('chartA', {type:'bar', data:{labels, datasets:[{label:'Records', data:labels.map(l=>counts[l]), backgroundColor:'#0F2C4C'}]}, options:{plugins:{title:{display:true,text:'Grade Level Distribution (Promotion Grade)'}}}}, 'A');
+  drawChart('chartA', {type:'bar', data:{labels:labels.map(l=>'GL'+l), datasets:[{label:'Records', data:labels.map(l=>counts[l]), backgroundColor:'#0F2C4C'}]}, options:{plugins:{title:{display:true,text:'Grade Level Distribution (Promotion Grade)'}}}}, 'A');
 });
 document.getElementById('chart-mda').addEventListener('click', ()=>{
   const rows = currentFilteredData(); const counts={};
@@ -2121,16 +2131,36 @@ document.getElementById('chart-mda').addEventListener('click', ()=>{
   const labels = Object.keys(counts);
   drawChart('chartA', {type:'bar', data:{labels, datasets:[{label:'Records', data:labels.map(l=>counts[l]), backgroundColor:'#B9892E'}]}, options:{indexAxis:'y', plugins:{title:{display:true,text:'Records by MDA'}}}}, 'A');
 });
-document.getElementById('chart-disability').addEventListener('click', ()=>{
-  const rows = currentFilteredData(); let withD=0, without=0;
-  rows.forEach(r=>{ (r.disability && !/^(none|nil|n\/a)$/i.test(r.disability.trim())) ? withD++ : without++; });
-  drawChart('chartB', {type:'doughnut', data:{labels:['PLWD','None declared'], datasets:[{data:[withD,without], backgroundColor:['#B3261E','#1E7145']}]}, options:{plugins:{title:{display:true,text:'Disability Inclusion'}}}}, 'B');
+document.getElementById('chart-notional').addEventListener('click', ()=>{
+  // Count officers whose Proposed Notional Date falls in the January cycle vs the July cycle.
+  const rows = currentFilteredData(); let jan=0, jul=0, other=0;
+  rows.forEach(r=>{
+    const d = parseFlexibleDate(r.proposed_notional_date);
+    if (!d){ other++; return; }
+    const m = d.getUTCMonth(); // 0 = Jan
+    if (m===0) jan++; else if (m===6) jul++; else other++;
+  });
+  const labels = ['January (01-Jan-2027)','July (01-Jul-2027)'];
+  const data = [jan, jul];
+  const bg = ['#0F2C4C','#B9892E'];
+  if (other){ labels.push('Other / unrecognised'); data.push(other); bg.push('#9AA3AD'); }
+  drawChart('chartA', {type:'bar', data:{labels, datasets:[{label:'Officers', data, backgroundColor:bg}]},
+    options:{plugins:{title:{display:true,text:`Notional Date Analysis — January: ${jan}, July: ${jul}`}}}}, 'A');
 });
-document.getElementById('chart-timeline').addEventListener('click', ()=>{
-  const rows = currentFilteredData(); const counts={};
-  rows.forEach(r=>{ const d=(r.timestamp||'').slice(0,10); if(d) counts[d]=(counts[d]||0)+1; });
-  const labels = Object.keys(counts).sort();
-  drawChart('chartB', {type:'line', data:{labels, datasets:[{label:'Submissions', data:labels.map(l=>counts[l]), borderColor:'#0F2C4C', tension:.25}]}, options:{plugins:{title:{display:true,text:'Submissions Over Time'}}}}, 'B');
+document.getElementById('chart-bracket').addEventListener('click', ()=>{
+  // Count officers by PROMOTION grade bracket: GL06–GL10 vs GL12–GL16.
+  const rows = currentFilteredData(); let low=0, high=0, other=0;
+  rows.forEach(r=>{
+    const g = parseInt(normalizeGrade(r.grade_promotion),10);
+    if (isNaN(g)){ other++; return; }
+    if (g>=6 && g<=10) low++; else if (g>=12 && g<=16) high++; else other++;
+  });
+  const labels = ['GL06 – GL10','GL12 – GL16'];
+  const data = [low, high];
+  const bg = ['#1E7145','#0F2C4C'];
+  if (other){ labels.push('Outside brackets'); data.push(other); bg.push('#9AA3AD'); }
+  drawChart('chartB', {type:'bar', data:{labels, datasets:[{label:'Officers on promotion', data, backgroundColor:bg}]},
+    options:{plugins:{title:{display:true,text:`Promotion Bracket — GL06–10: ${low}, GL12–16: ${high}`}}}}, 'B');
 });
 
 /* =========================================================================
